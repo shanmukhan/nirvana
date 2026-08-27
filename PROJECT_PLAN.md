@@ -62,15 +62,18 @@ Three priority tiers (high/medium/low) with snooze, skip, reschedule, quiet hour
 - Tech stack decision + project init: **Flutter**, scaffolded in `app/` (done)
 - `RoutineConfig` schema + local SQLite schema for all entities above (done — see `app/lib/domain/routine_config.dart`, `app/lib/domain/entities.dart`, `app/lib/data/db/`)
 - Basic navigation shell for the 10 screens (done — drawer nav + go_router in `app/lib/app_shell/`, stub screens in `app/lib/screens/`; `flutter analyze` and `flutter test` both pass)
-- Remaining before Phase 1: wire `flutter_local_notifications` init, decide on a DAO/repository pattern over `sqflite` for the entities, seed the 6 `ExerciseDefinition` rows from health-plan-source.md §6
+- Repository layer over `sqflite` (done — one repo per entity in `app/lib/data/repositories/`, wired via Riverpod providers in `app/lib/providers/`), `flutter_local_notifications` init + priority-tiered Android channels (done — `app/lib/services/notification_service.dart`; scheduling driven by `RoutineConfig` is still open, see Phase 1), 6 `ExerciseDefinition` rows seeded from health-plan-source.md §6 on first launch (done)
+- App identity for Play Store: app name **Nirvana**, package/applicationId **com.nirvana.nirvana** (fixed once published — see `app/android/app/build.gradle.kts`)
 
 ### Phase 1 — MVP: the daily loop
-- Dashboard with live data from Water, Weight, Knee, Dhyana
-- Hydration: quick-log buttons, progress ring, reminders with snooze/skip
-- Desk breaks: eye, movement, knee-mobility, posture reminders on configurable intervals
-- Dhyana: timer + start/end bell + session log (see [dhyana-plan.md](docs/dhyana-plan.md))
-- Weight entry + 7-day average + trend
-- Manual exercise logging (no video yet) with pain rating (§8)
+- Dashboard with live data from Water, Weight, Knee, Dhyana (done)
+- Hydration: quick-log buttons, progress ring (done); snooze/skip reminders — not yet, no scheduled notifications wired up yet
+- Desk breaks: eye, movement, knee-mobility, posture reminders on configurable intervals — not started (screen is still a stub)
+- Dhyana: timer + start/end bell (system-sound stand-in, not a real bell yet) + session log (done — see [dhyana-plan.md](docs/dhyana-plan.md))
+- Weight entry + 7-day average + trend (done; trend chart not yet — currently a list + average card)
+- Knee pain/swelling/stiffness log with red-flag "consider professional assessment" routing (done, pulled forward from §8/§22)
+- Manual exercise logging (no video yet) with pain rating (§8) — not started (screen is still a stub)
+- Remaining for Phase 1: desk-break + hydration reminder scheduling against `RoutineConfig` (quiet hours, snooze/skip), manual exercise logging screen
 
 ### Phase 2 — Guided exercise + food
 - Exercise screen: illustrated/timed sessions for the 6 strength exercises (§6) with sets/reps/timer/completion/"too painful" feedback
@@ -101,7 +104,11 @@ nirvana/
   app/                        # Flutter app
     lib/
       domain/                 # RoutineConfig + entities, plain Dart, no UI/DB deps
-      data/db/                # sqflite schema + AppDatabase
+      data/
+        db/                   # sqflite schema + AppDatabase
+        repositories/         # one repository per entity, wraps sqflite
+      providers/              # Riverpod providers wiring repositories to screens
+      services/               # NotificationService (flutter_local_notifications)
       app_shell/               # go_router routes, nav destinations
       screens/<screen>/       # one folder per v1 screen
       main.dart
