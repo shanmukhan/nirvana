@@ -1,4 +1,32 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- For the continuous-phone-usage warning (Settings > Phone usage
+         warning). Not a runtime-dialog permission — granted by the user
+         from the system "Usage access" settings screen, which
+         PhoneUsageService.requestPermission() opens. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- Runtime-requested on Android 13+ via
+         NotificationService.requestPermission(), called at app start in
+         main.dart — needed for every reminder notification. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets scheduled reminder notifications fire on time after a device
+         reboot (flutter_local_notifications re-registers its alarms via a
+         boot receiver it bundles). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Lets Settings offer an explicit "exempt from battery optimization"
+         action (BatteryOptimizationService.requestExemption()) — OEM
+         battery managers, especially Motorola's, are known to silently
+         drop scheduled notifications for apps that aren't exempted. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Reminder notifications need to fire at (near-)exact times, not
+         batched into an OS-chosen window that can run 30-60+ minutes late
+         (see NotificationService.scheduleDaily). Auto-granted by default
+         on Android 12; user-revocable there and requestable on Android
+         13+ via NotificationService.requestExactAlarmsPermission(),
+         surfaced from the "Background reliability" Settings card. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <application
         android:label="Nirvana"
         android:name="${applicationName}"

@@ -193,7 +193,7 @@ enum HabitType {
   eyeBreak,
   movementBreak,
   kneeMobilityBreak,
-  postureBreak,
+  neckExercise,
   hydration,
   strengthSession,
   morningWalk,

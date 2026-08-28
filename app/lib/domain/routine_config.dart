@@ -53,9 +53,25 @@ class HydrationConfig {
     ],
     this.quickLogAmountsMl = const [150, 250, 300, 500],
   });
+
+  /// Only `dailyGoalMl`/`quickLogAmountsMl` round-trip — those are the
+  /// fields actually surfaced in the Settings "Hydration goal" editor and
+  /// read elsewhere in the app (Water/Dashboard/Progress screens). `slots`
+  /// isn't read anywhere yet (water reminder scheduling uses the simpler
+  /// interval-based `ReminderPrefs` model, not this list) so it stays at
+  /// its in-code default rather than adding dead persistence surface.
+  Map<String, dynamic> toMap() => {
+    'dailyGoalMl': dailyGoalMl,
+    'quickLogAmountsMl': quickLogAmountsMl,
+  };
+
+  factory HydrationConfig.fromMap(Map<String, dynamic> map) => HydrationConfig(
+    dailyGoalMl: map['dailyGoalMl'] as int? ?? 2250,
+    quickLogAmountsMl: (map['quickLogAmountsMl'] as List?)?.cast<int>() ?? const [150, 250, 300, 500],
+  );
 }
 
-/// Repeating interval-based desk break (eye, movement, knee mobility, posture).
+/// Repeating interval-based desk break (eye, movement, knee mobility, neck).
 class DeskBreakConfig {
   final bool enabled;
   final int intervalMinutes;
@@ -76,7 +92,9 @@ class DeskBreaksConfig {
   final DeskBreakConfig eyeBreak;
   final DeskBreakConfig movementBreak;
   final DeskBreakConfig kneeMobilityBreak;
-  final DeskBreakConfig postureBreak;
+  /// Chin tucks, neck rotation, ear-to-shoulder, shoulder rolls, chest
+  /// stretch. See health-plan-source.md §4D.
+  final DeskBreakConfig neckExercise;
 
   const DeskBreaksConfig({
     this.eyeBreak = const DeskBreakConfig(
@@ -94,7 +112,7 @@ class DeskBreaksConfig {
       intervalMinutes: 120,
       durationMinutes: 4,
     ),
-    this.postureBreak = const DeskBreakConfig(
+    this.neckExercise = const DeskBreakConfig(
       enabled: true,
       intervalMinutes: 75,
       durationMinutes: 4,
@@ -186,6 +204,23 @@ class QuietHoursConfig {
   });
 }
 
+/// Warns after too much continuous phone screen time, with a snooze
+/// option. Android-only (needs the system "Usage access" permission —
+/// there is no equivalent whole-device usage API on iOS). Not part of
+/// the original health-plan-source.md schedule; added as a standalone
+/// configurable habit alongside desk breaks.
+class PhoneUsageConfig {
+  final bool enabled;
+  final int continuousThresholdMinutes;
+  final int snoozeMinutes;
+
+  const PhoneUsageConfig({
+    this.enabled = true,
+    this.continuousThresholdMinutes = 15,
+    this.snoozeMinutes = 15,
+  });
+}
+
 /// Weekday vs weekend schedules differ; notifications respect quiet hours
 /// and priority tiers. See PROJECT_PLAN.md §6 / health-plan-source.md §19.
 class NotificationConfig {
@@ -212,6 +247,7 @@ class RoutineConfig {
   final DhyanaConfig dhyana;
   final ExerciseScheduleConfig exerciseSchedule;
   final NotificationConfig notifications;
+  final PhoneUsageConfig phoneUsage;
   final TimeOfDayConfig wakeTime;
   final TimeOfDayConfig sleepTime;
 
@@ -222,6 +258,7 @@ class RoutineConfig {
     this.dhyana = const DhyanaConfig(),
     this.exerciseSchedule = const ExerciseScheduleConfig(),
     this.notifications = const NotificationConfig(),
+    this.phoneUsage = const PhoneUsageConfig(),
     this.wakeTime = const TimeOfDayConfig(6, 0),
     this.sleepTime = const TimeOfDayConfig(22, 0),
   });

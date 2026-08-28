@@ -15,7 +15,10 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.nirvana.nirvana"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires compileSdk 37; Flutter's own
+    // default (flutter.compileSdkVersion) hadn't caught up yet as of this
+    // Flutter version, so it's pinned explicitly here.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

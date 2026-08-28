@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/meal_templates.dart';
 import '../../providers/dhyana_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/water_providers.dart';
+import '../exercise/exercise_screen.dart' show exerciseDefinitionsProvider, exerciseSessionsTodayProvider;
+import '../food/food_screen.dart' show mealEntriesTodayProvider;
 import '../screen_scaffold.dart';
 import '../weight/weight_screen.dart' show sevenDayAverageProvider, recentWeightEntriesProvider;
 
-/// Today/Dashboard — live cards for Weight, Water, Knee, Dhyana today.
-/// Movement/Desk-health/Exercise/Nutrition cards land as those screens go
-/// live in the rest of Phase 1/2. See health-plan-source.md §18.
+/// Today/Dashboard — live cards for Weight, Water, Knee, Dhyana, Exercise,
+/// Nutrition today. Movement/Desk-health cards land as those screens go
+/// live in the rest of Phase 2/3. See health-plan-source.md §18.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -28,6 +31,10 @@ class DashboardScreen extends ConsumerWidget {
           _KneeCard(onTap: () => context.go('/knee')),
           const SizedBox(height: 12),
           _DhyanaCard(onTap: () => context.go('/dhyana')),
+          const SizedBox(height: 12),
+          _ExerciseCard(onTap: () => context.go('/exercise')),
+          const SizedBox(height: 12),
+          _NutritionCard(onTap: () => context.go('/food')),
         ],
       ),
     );
@@ -112,6 +119,7 @@ class _WaterCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = ref.watch(waterTodayTotalProvider);
+    final hydrationConfig = ref.watch(hydrationConfigProvider);
     return _DashboardCard(
       title: 'Water',
       icon: Icons.water_drop_outlined,
@@ -119,7 +127,7 @@ class _WaterCard extends ConsumerWidget {
       child: total.when(
         loading: () => const Text('Loading…'),
         error: (e, _) => const Text('—'),
-        data: (ml) => Text('$ml ml of ${defaultHydrationConfig.dailyGoalMl} ml goal'),
+        data: (ml) => Text('$ml ml of ${hydrationConfig.asData?.value.dailyGoalMl ?? 2250} ml goal'),
       ),
     );
   }
@@ -177,6 +185,61 @@ class _DhyanaCard extends ConsumerWidget {
           return Text(
             'Sessions today: ${sessions.length}'
             '${streakText != null && streakText > 0 ? '  ·  Streak: $streakText days' : ''}',
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ExerciseCard extends ConsumerWidget {
+  final VoidCallback onTap;
+
+  const _ExerciseCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final definitionsAsync = ref.watch(exerciseDefinitionsProvider);
+    final sessionsAsync = ref.watch(exerciseSessionsTodayProvider);
+    return _DashboardCard(
+      title: 'Exercise',
+      icon: Icons.fitness_center_outlined,
+      onTap: onTap,
+      child: definitionsAsync.when(
+        loading: () => const Text('Loading…'),
+        error: (e, _) => const Text('—'),
+        data: (definitions) {
+          final sessionsToday = sessionsAsync.asData?.value ?? const [];
+          final done = sessionsToday.map((s) => s.exerciseDefinitionId).toSet().length;
+          return Text('$done of ${definitions.length} exercises logged today');
+        },
+      ),
+    );
+  }
+}
+
+class _NutritionCard extends ConsumerWidget {
+  final VoidCallback onTap;
+
+  const _NutritionCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entriesAsync = ref.watch(mealEntriesTodayProvider);
+    return _DashboardCard(
+      title: 'Nutrition',
+      icon: Icons.restaurant_outlined,
+      onTap: onTap,
+      child: entriesAsync.when(
+        loading: () => const Text('Loading…'),
+        error: (e, _) => const Text('—'),
+        data: (entries) {
+          final protein = entries.fold<double>(0, (sum, e) => sum + (e.proteinEstimateG ?? 0));
+          return Text(
+            '${entries.length} meals logged  ·  '
+            '~${protein.toStringAsFixed(0)} g protein '
+            '(target ${dailyProteinTargetMinG.toStringAsFixed(0)}-'
+            '${dailyProteinTargetMaxG.toStringAsFixed(0)} g)',
           );
         },
       ),

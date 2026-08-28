@@ -3,7 +3,9 @@ import 'package:sqflite/sqflite.dart';
 
 import '../data/repositories/dhyana_repository.dart';
 import '../data/repositories/exercise_repository.dart';
+import '../data/repositories/meal_repository.dart';
 import '../data/repositories/pain_repository.dart';
+import '../data/repositories/routine_config_repository.dart';
 import '../data/repositories/user_profile_repository.dart';
 import '../data/repositories/water_repository.dart';
 import '../data/repositories/weight_repository.dart';
@@ -34,6 +36,14 @@ final painRepositoryProvider = Provider<PainRepository>(
 
 final exerciseRepositoryProvider = Provider<ExerciseRepository>(
   (ref) => ExerciseRepository(ref.watch(databaseProvider)),
+);
+
+final mealRepositoryProvider = Provider<MealRepository>(
+  (ref) => MealRepository(ref.watch(databaseProvider)),
+);
+
+final routineConfigRepositoryProvider = Provider<RoutineConfigRepository>(
+  (ref) => RoutineConfigRepository(ref.watch(databaseProvider)),
 );
 
 final userProfileRepositoryProvider = Provider<UserProfileRepository>(
