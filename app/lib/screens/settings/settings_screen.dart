@@ -259,7 +259,7 @@ class _WaterReminderCardState extends State<_WaterReminderCard> {
       onEnabledChanged: (v) async {
         setState(() => _enabled = v);
         await ReminderPrefs.setWaterEnabled(v);
-        await ReminderScheduler.instance.rescheduleAll();
+        await ReminderScheduler.instance.rescheduleWater();
       },
       children: [
         Text('Every $_intervalMinutes minutes'),
@@ -272,7 +272,7 @@ class _WaterReminderCardState extends State<_WaterReminderCard> {
           onChanged: (v) => setState(() => _intervalMinutes = v.round()),
           onChangeEnd: (v) async {
             await ReminderPrefs.setWaterIntervalMinutes(v.round());
-            await ReminderScheduler.instance.rescheduleAll();
+            await ReminderScheduler.instance.rescheduleWater();
           },
         ),
         _TimeRangeRow(
@@ -283,14 +283,14 @@ class _WaterReminderCardState extends State<_WaterReminderCard> {
             if (picked == null) return;
             setState(() => _fromMinutes = picked);
             await ReminderPrefs.setWaterFromMinutes(picked);
-            await ReminderScheduler.instance.rescheduleAll();
+            await ReminderScheduler.instance.rescheduleWater();
           },
           onTapTo: () async {
             final picked = await _pickTime(context, _toMinutes);
             if (picked == null) return;
             setState(() => _toMinutes = picked);
             await ReminderPrefs.setWaterToMinutes(picked);
-            await ReminderScheduler.instance.rescheduleAll();
+            await ReminderScheduler.instance.rescheduleWater();
           },
         ),
       ],
@@ -337,7 +337,7 @@ class _DhyanaReminderCardState extends State<_DhyanaReminderCard> {
       onEnabledChanged: (v) async {
         setState(() => _enabled = v);
         await ReminderPrefs.setDhyanaEnabled(v);
-        await ReminderScheduler.instance.rescheduleAll();
+        await ReminderScheduler.instance.rescheduleDhyana();
       },
       children: [
         ListTile(
@@ -349,7 +349,7 @@ class _DhyanaReminderCardState extends State<_DhyanaReminderCard> {
             if (picked == null) return;
             setState(() => _timeMinutes = picked);
             await ReminderPrefs.setDhyanaTimeMinutes(picked);
-            await ReminderScheduler.instance.rescheduleAll();
+            await ReminderScheduler.instance.rescheduleDhyana();
           },
         ),
       ],
@@ -396,7 +396,7 @@ class _KneeReminderCardState extends State<_KneeReminderCard> {
       onEnabledChanged: (v) async {
         setState(() => _enabled = v);
         await ReminderPrefs.setKneeEnabled(v);
-        await ReminderScheduler.instance.rescheduleAll();
+        await ReminderScheduler.instance.rescheduleKneeCheckin();
       },
       children: [
         ListTile(
@@ -408,7 +408,7 @@ class _KneeReminderCardState extends State<_KneeReminderCard> {
             if (picked == null) return;
             setState(() => _timeMinutes = picked);
             await ReminderPrefs.setKneeTimeMinutes(picked);
-            await ReminderScheduler.instance.rescheduleAll();
+            await ReminderScheduler.instance.rescheduleKneeCheckin();
           },
         ),
       ],
@@ -455,7 +455,7 @@ class _WeightReminderCardState extends State<_WeightReminderCard> {
       onEnabledChanged: (v) async {
         setState(() => _enabled = v);
         await ReminderPrefs.setWeightEnabled(v);
-        await ReminderScheduler.instance.rescheduleAll();
+        await ReminderScheduler.instance.rescheduleWeightCheckin();
       },
       children: [
         ListTile(
@@ -467,7 +467,7 @@ class _WeightReminderCardState extends State<_WeightReminderCard> {
             if (picked == null) return;
             setState(() => _timeMinutes = picked);
             await ReminderPrefs.setWeightTimeMinutes(picked);
-            await ReminderScheduler.instance.rescheduleAll();
+            await ReminderScheduler.instance.rescheduleWeightCheckin();
           },
         ),
       ],
@@ -605,14 +605,14 @@ class _DeskBreaksReminderCardState extends State<_DeskBreaksReminderCard> {
                 if (picked == null) return;
                 setState(() => _fromMinutes = picked);
                 await ReminderPrefs.setDeskFromMinutes(picked);
-                await ReminderScheduler.instance.rescheduleAll();
+                await ReminderScheduler.instance.rescheduleAllDeskBreaks();
               },
               onTapTo: () async {
                 final picked = await _pickTime(context, _toMinutes);
                 if (picked == null) return;
                 setState(() => _toMinutes = picked);
                 await ReminderPrefs.setDeskToMinutes(picked);
-                await ReminderScheduler.instance.rescheduleAll();
+                await ReminderScheduler.instance.rescheduleAllDeskBreaks();
               },
             ),
             const Divider(height: 24),
@@ -639,7 +639,7 @@ class _DeskBreaksReminderCardState extends State<_DeskBreaksReminderCard> {
                 onChanged: (v) async {
                   setState(() => _enabled[type] = v);
                   await ReminderPrefs.setDeskBreakEnabled(type, v);
-                  await ReminderScheduler.instance.rescheduleAll();
+                  await ReminderScheduler.instance.rescheduleDeskBreak(type);
                 },
               ),
             ],
@@ -655,7 +655,7 @@ class _DeskBreaksReminderCardState extends State<_DeskBreaksReminderCard> {
               onChanged: (v) => setState(() => _intervals[type] = v.round()),
               onChangeEnd: (v) async {
                 await ReminderPrefs.setDeskBreakIntervalMinutes(type, v.round());
-                await ReminderScheduler.instance.rescheduleAll();
+                await ReminderScheduler.instance.rescheduleDeskBreak(type);
               },
             ),
           ],
