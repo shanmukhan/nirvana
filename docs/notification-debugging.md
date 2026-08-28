@@ -120,6 +120,70 @@ something else keeping it there (worth searching for a
 Motorola-specific "adaptive battery" override, since standard Android
 `am set-standby-bucket` couldn't clear it in this session).
 
+## Finding 4 — flutter_local_notifications 22.x doesn't bundle its receivers in its own manifest anymore (2026-08-28, ~23:20-23:55 IST)
+
+**Symptom:** on a fresh install (release build, `flutter build apk --release`
++ `flutter install`), with exact-alarm permission confirmed granted and
+battery optimization confirmed exempted (Settings > Background reliability
+both showed green checks), a scheduled reminder *still* didn't fire.
+`adb shell dumpsys alarm` showed the alarm present before the target time
+and gone after (fired), and `AlarmManager` stats confirmed exactly one
+wake for the app at the target second — but no notification appeared, and
+`dumpsys notification --package com.nirvana.nirvana` archive stayed empty.
+
+**Cause, found via `adb shell dumpsys activity broadcasts | grep -A3
+nirvana`:** the broadcast targeting
+`com.nirvana.nirvana/com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver`
+was enqueued at the correct second but its `disp=` (dispatch) timestamp
+was epoch zero (`1970-01-01 05:30:00.000`) — i.e. it was never actually
+delivered, just immediately marked finished. `adb shell dumpsys package
+com.nirvana.nirvana | grep -A3 ScheduledNotificationReceiver` confirmed
+why: **the component doesn't exist in the installed package at all.**
+`app/android/app/src/main/AndroidManifest.xml` had no `<receiver>` entries
+for it, and — unlike older versions — `flutter_local_notifications`
+22.3.0's own plugin manifest
+(`build/flutter_local_notifications/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml`)
+is minimal (just two `<uses-permission>` tags, no receivers). This plugin
+version requires the **app** to manually declare
+`ScheduledNotificationReceiver`, `ScheduledNotificationBootReceiver`, and
+`ActionBroadcastReceiver` in its own manifest (confirmed against the
+plugin's own `example/android/app/src/main/AndroidManifest.xml` in
+`~/.pub-cache`). Without them, AlarmManager fires exactly on schedule but
+the broadcast has no component to resolve to and is silently dropped —
+no crash, no log line, nothing. This affects **every** reminder category
+(water, dhyana, desk breaks, knee check-in, weigh-in), not just one.
+
+**Fix:** added the three missing `<receiver>` blocks to
+`app/android/app/src/main/AndroidManifest.xml` inside `<application>`,
+copied verbatim from the plugin's example app:
+
+```xml
+<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+    </intent-filter>
+</receiver>
+```
+
+Also corrected a stale comment above the `RECEIVE_BOOT_COMPLETED`
+permission that claimed the plugin "bundles" its own boot receiver — it
+doesn't, as of 22.x. Confirmed the fix via `adb shell dumpsys package
+com.nirvana.nirvana | grep -A3 ScheduledNotificationBootReceiver` showing
+the component resolvable post-rebuild.
+
+**Note:** this may explain some or all of Findings 1-3 above being harder
+to pin down than expected — every retest during those sessions would have
+hit this same silent-drop failure mode regardless of alarm-scheduling
+correctness, standby bucket, or battery optimization state, since the
+receiver was never resolvable in any of those builds either. Re-verify
+Finding 3's per-category rescheduling fix now that the actual delivery
+path works.
+
 ## How to re-run this diagnosis from scratch
 
 ```
@@ -148,4 +212,14 @@ adb -s $D shell dumpsys notification --noredact | grep -B5 -A20 "pkg=com.nirvana
 
 # Any trace of the receiver running at all?
 adb -s $D logcat -d -b all -v time | grep -i "nirvana\|dexterous"
+
+# Is the receiver component even installed? (Finding 4 — check this FIRST,
+# before chasing alarm/standby/battery theories again)
+adb -s $D shell dumpsys package com.nirvana.nirvana | grep -A3 ScheduledNotificationReceiver
+# empty output = the manifest <receiver> entries are missing or got
+# stripped from this build; broadcasts will fire and vanish silently
+
+# Did the broadcast actually get dispatched, or just enqueued-and-dropped?
+adb -s $D shell dumpsys activity broadcasts | grep -A3 "ScheduledNotificationReceiver"
+# disp=1970-01-01 05:30:00.000 (epoch zero) = enqueued but never delivered
 ```

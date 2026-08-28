@@ -12,8 +12,8 @@
          main.dart — needed for every reminder notification. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Lets scheduled reminder notifications fire on time after a device
-         reboot (flutter_local_notifications re-registers its alarms via a
-         boot receiver it bundles). -->
+         reboot (ScheduledNotificationBootReceiver below re-registers the
+         plugin's alarms on BOOT_COMPLETED). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Lets Settings offer an explicit "exempt from battery optimization"
          action (BatteryOptimizationService.requestExemption()) — OEM
@@ -58,6 +58,20 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- flutter_local_notifications 22.x no longer bundles these in its
+             own manifest — without them, AlarmManager's exact-alarm
+             broadcasts have no component to resolve to and are silently
+             dropped, so no scheduled reminder ever fires. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
