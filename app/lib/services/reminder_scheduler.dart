@@ -95,6 +95,30 @@ class ReminderScheduler {
     }
   }
 
+  /// Today's scheduled slots for every enabled desk-break type, in local
+  /// hour/minute — used by [DeskBreakLogRepository.sweepAutoMissed] to
+  /// figure out which slots have gone unanswered. See that method's doc
+  /// for why this is a lazy sweep rather than an exact background timer.
+  Future<Map<DeskBreakType, List<(int hour, int minute)>>> todaysDeskBreakSlots() async {
+    final quietHours = await QuietHoursWindow.load();
+    final fromMinutes = await ReminderPrefs.deskFromMinutes();
+    final toMinutes = await ReminderPrefs.deskToMinutes();
+    final result = <DeskBreakType, List<(int, int)>>{};
+    for (final type in DeskBreakType.values) {
+      if (!await ReminderPrefs.deskBreakEnabled(type)) {
+        result[type] = const [];
+        continue;
+      }
+      result[type] = _dailySlots(
+        fromMinutes: fromMinutes,
+        toMinutes: toMinutes,
+        intervalMinutes: await ReminderPrefs.deskBreakIntervalMinutes(type),
+        quietHours: quietHours,
+      );
+    }
+    return result;
+  }
+
   Future<void> _cancelRange(int base, int count) async {
     for (var i = 0; i < count; i++) {
       await NotificationService.instance.cancel(base + i);
@@ -140,6 +164,7 @@ class ReminderScheduler {
         hour: hour,
         minute: minute,
         priority: NotificationPriorityTier.high,
+        payload: 'water',
       );
     }
   }
@@ -206,6 +231,7 @@ class ReminderScheduler {
         priority: type == DeskBreakType.eye
             ? NotificationPriorityTier.low
             : NotificationPriorityTier.medium,
+        payload: 'deskbreak:${type.name}:$hour:$minute',
       );
     }
   }

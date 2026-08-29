@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 /// title and a drawer listing all 10 v1 screens (PROJECT_PLAN.md §5).
 class ScreenScaffold extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final Widget body;
   final List<Widget>? actions;
 
@@ -15,15 +16,41 @@ class ScreenScaffold extends StatelessWidget {
     super.key,
     required this.title,
     required this.body,
+    this.subtitle,
     this.actions,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title), actions: actions),
-      drawer: const NirvanaDrawer(),
-      body: body,
+    final currentRoute = GoRouterState.of(context).matchedLocation;
+    final isDashboard = currentRoute == '/';
+    return PopScope(
+      canPop: isDashboard,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && !isDashboard) context.go('/');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: subtitle == null
+              ? Text(title)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title),
+                    Text(
+                      subtitle!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).appBarTheme.foregroundColor?.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+          actions: actions,
+        ),
+        drawer: const NirvanaDrawer(),
+        body: body,
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../data/repositories/backup_repository.dart';
+import '../data/repositories/desk_break_log_repository.dart';
 import '../data/repositories/dhyana_repository.dart';
 import '../data/repositories/exercise_repository.dart';
 import '../data/repositories/meal_repository.dart';
@@ -48,6 +50,14 @@ final routineConfigRepositoryProvider = Provider<RoutineConfigRepository>(
 
 final userProfileRepositoryProvider = Provider<UserProfileRepository>(
   (ref) => UserProfileRepository(ref.watch(databaseProvider)),
+);
+
+final deskBreakLogRepositoryProvider = Provider<DeskBreakLogRepository>(
+  (ref) => DeskBreakLogRepository(ref.watch(databaseProvider)),
+);
+
+final backupRepositoryProvider = Provider<BackupRepository>(
+  (ref) => BackupRepository(ref.watch(databaseProvider)),
 );
 
 /// Bootstraps the default UserProfile/RoutineConfig and exercise library

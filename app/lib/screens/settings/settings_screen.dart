@@ -1,8 +1,14 @@
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../domain/routine_config.dart';
 import '../../providers/repository_providers.dart';
@@ -48,7 +54,7 @@ class SettingsScreen extends StatelessWidget {
           SizedBox(height: 12),
           _DhyanaReminderCard(),
           SizedBox(height: 12),
-          _DeskBreaksReminderCard(),
+          _DeskBreaksSettingsLinkCard(),
           SizedBox(height: 12),
           _KneeReminderCard(),
           SizedBox(height: 12),
@@ -63,6 +69,10 @@ class SettingsScreen extends StatelessWidget {
           _SectionHeader('Phone usage'),
           SizedBox(height: 8),
           _PhoneUsageSettingsCard(),
+          SizedBox(height: 24),
+          _SectionHeader('Data'),
+          SizedBox(height: 8),
+          _BackupCard(),
         ],
       ),
     );
@@ -545,121 +555,19 @@ class _QuietHoursCardState extends State<_QuietHoursCard> {
   }
 }
 
-class _DeskBreaksReminderCard extends StatefulWidget {
-  const _DeskBreaksReminderCard();
-
-  @override
-  State<_DeskBreaksReminderCard> createState() => _DeskBreaksReminderCardState();
-}
-
-class _DeskBreaksReminderCardState extends State<_DeskBreaksReminderCard> {
-  int _fromMinutes = ReminderPrefs.defaultDeskFromMinutes;
-  int _toMinutes = ReminderPrefs.defaultDeskToMinutes;
-  final Map<DeskBreakType, bool> _enabled = {};
-  final Map<DeskBreakType, int> _intervals = {};
-  bool _loaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final from = await ReminderPrefs.deskFromMinutes();
-    final to = await ReminderPrefs.deskToMinutes();
-    for (final type in DeskBreakType.values) {
-      _enabled[type] = await ReminderPrefs.deskBreakEnabled(type);
-      _intervals[type] = await ReminderPrefs.deskBreakIntervalMinutes(type);
-    }
-    if (!mounted) return;
-    setState(() {
-      _fromMinutes = from;
-      _toMinutes = to;
-      _loaded = true;
-    });
-  }
+/// Desk-break reminder settings live on the Desk Breaks screen itself now
+/// (requirements §5) — this card just links there so Settings stays short.
+class _DeskBreaksSettingsLinkCard extends StatelessWidget {
+  const _DeskBreaksSettingsLinkCard();
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) return const _LoadingCard();
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Desk breaks', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'Eye, movement, knee mobility, and neck-exercise reminders during '
-              'your active hours.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            _TimeRangeRow(
-              fromLabel: 'Active from ${_formatMinutes(_fromMinutes)}',
-              toLabel: 'to ${_formatMinutes(_toMinutes)}',
-              onTapFrom: () async {
-                final picked = await _pickTime(context, _fromMinutes);
-                if (picked == null) return;
-                setState(() => _fromMinutes = picked);
-                await ReminderPrefs.setDeskFromMinutes(picked);
-                await ReminderScheduler.instance.rescheduleAllDeskBreaks();
-              },
-              onTapTo: () async {
-                final picked = await _pickTime(context, _toMinutes);
-                if (picked == null) return;
-                setState(() => _toMinutes = picked);
-                await ReminderPrefs.setDeskToMinutes(picked);
-                await ReminderScheduler.instance.rescheduleAllDeskBreaks();
-              },
-            ),
-            const Divider(height: 24),
-            for (final type in DeskBreakType.values) _deskBreakRow(type),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _deskBreakRow(DeskBreakType type) {
-    final enabled = _enabled[type] ?? true;
-    final interval = _intervals[type] ?? type.defaultIntervalMinutes;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text(type.label)),
-              Switch(
-                value: enabled,
-                onChanged: (v) async {
-                  setState(() => _enabled[type] = v);
-                  await ReminderPrefs.setDeskBreakEnabled(type, v);
-                  await ReminderScheduler.instance.rescheduleDeskBreak(type);
-                },
-              ),
-            ],
-          ),
-          if (enabled) ...[
-            Text('Every $interval minutes', style: Theme.of(context).textTheme.bodySmall),
-            Slider(
-              value: interval.toDouble(),
-              min: 15,
-              max: 180,
-              divisions: 11,
-              label: '$interval min',
-              onChanged: (v) => setState(() => _intervals[type] = v.round()),
-              onChangeEnd: (v) async {
-                await ReminderPrefs.setDeskBreakIntervalMinutes(type, v.round());
-                await ReminderScheduler.instance.rescheduleDeskBreak(type);
-              },
-            ),
-          ],
-        ],
+      child: ListTile(
+        title: const Text('Desk breaks'),
+        subtitle: const Text('Eye, movement, knee mobility, and neck-exercise reminders'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.go('/desk-breaks'),
       ),
     );
   }
@@ -974,6 +882,117 @@ class _PhoneUsageSettingsCardState extends State<_PhoneUsageSettingsCard>
                 onChanged: _enabled ? (v) => _setSnooze(v.round()) : null,
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupCard extends ConsumerStatefulWidget {
+  const _BackupCard();
+
+  @override
+  ConsumerState<_BackupCard> createState() => _BackupCardState();
+}
+
+class _BackupCardState extends ConsumerState<_BackupCard> {
+  bool _busy = false;
+
+  Future<void> _export() async {
+    setState(() => _busy = true);
+    try {
+      final json = await ref.read(backupRepositoryProvider).exportToJson();
+      final dir = await getTemporaryDirectory();
+      final fileName = 'nirvana_backup_${DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now())}.json';
+      final file = File(p.join(dir.path, fileName));
+      await file.writeAsString(json);
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: 'Nirvana data backup'),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _import() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) return;
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Import backup?'),
+        content: const Text(
+          'This replaces all current data — weight, water, meals, exercise, '
+          'pain, sleep, dhyana, and desk-break logs — with the contents of '
+          'the selected file. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Import')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    try {
+      final json = await File(path).readAsString();
+      await ref.read(backupRepositoryProvider).importFromJson(json);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Backup imported.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Backup', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Export everything you\'ve logged to a file, or restore from a '
+              'previous export.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            if (_busy)
+              const Center(child: CircularProgressIndicator())
+            else
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: _export,
+                    icon: const Icon(Icons.upload_outlined),
+                    label: const Text('Export'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _import,
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('Import'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

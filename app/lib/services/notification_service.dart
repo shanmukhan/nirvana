@@ -16,32 +16,55 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  /// Resource name (Android `res/raw`, no extension) / bundled file name
+  /// (iOS, with extension) for the custom "Nirvana" reminder tone. Android
+  /// notification-channel sound is immutable once a channel with a given
+  /// id has been created on a device, so switching a channel's sound
+  /// requires a brand-new channel id — hence `_v2` here rather than
+  /// reusing `nirvana_high`/`nirvana_medium`/`nirvana_low`. The old
+  /// channel ids are simply no longer scheduled against; a user who
+  /// already had them created keeps them as an orphaned, unused channel
+  /// (Android gives apps no way to delete another app's existing
+  /// channel, so there's nothing to clean up).
+  static const String _toneResource = 'nirvana_tone';
+  static const AndroidNotificationSound _androidTone = RawResourceAndroidNotificationSound(
+    _toneResource,
+  );
+  static const String _iosTone = 'nirvana_tone.wav';
+
   static const AndroidNotificationDetails _highPriorityAndroidDetails =
       AndroidNotificationDetails(
-        'nirvana_high',
+        'nirvana_high_v2',
         'High priority reminders',
         channelDescription: 'Hydration and scheduled exercise reminders',
         importance: Importance.high,
         priority: Priority.high,
+        sound: _androidTone,
       );
 
   static const AndroidNotificationDetails _mediumPriorityAndroidDetails =
       AndroidNotificationDetails(
-        'nirvana_medium',
+        'nirvana_medium_v2',
         'Medium priority reminders',
         channelDescription: 'Movement, knee mobility, and dhyana reminders',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
+        sound: _androidTone,
       );
 
   static const AndroidNotificationDetails _lowPriorityAndroidDetails =
       AndroidNotificationDetails(
-        'nirvana_low',
+        'nirvana_low_v2',
         'Low priority reminders',
         channelDescription: 'Eye-distance and neck-exercise reminders',
         importance: Importance.low,
         priority: Priority.low,
+        sound: _androidTone,
       );
+
+  static const DarwinNotificationDetails _iosDetails = DarwinNotificationDetails(
+    sound: _iosTone,
+  );
 
   /// Action id for the "Snooze" button on the continuous-phone-usage
   /// warning notification (see lib/services/phone_usage_service.dart).
@@ -72,6 +95,13 @@ class NotificationService {
     );
     _initialized = true;
   }
+
+  /// Details of the notification that launched the app from a killed
+  /// state, if any — flutter_local_notifications' normal tap callback
+  /// only fires for a warm/foregrounded app, so a cold launch via
+  /// notification tap has to be checked for explicitly. See main.dart.
+  Future<NotificationAppLaunchDetails?> appLaunchDetails() =>
+      _plugin.getNotificationAppLaunchDetails();
 
   Future<bool> requestPermission() async {
     final androidImpl = _plugin
@@ -125,7 +155,7 @@ class NotificationService {
           NotificationPriorityTier.medium => _mediumPriorityAndroidDetails,
           NotificationPriorityTier.low => _lowPriorityAndroidDetails,
         },
-        iOS: const DarwinNotificationDetails(),
+        iOS: _iosDetails,
       ),
     );
   }
@@ -145,11 +175,12 @@ class NotificationService {
           'Maybe a good moment for a short break.',
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          'nirvana_medium',
+          'nirvana_medium_v2',
           'Medium priority reminders',
           channelDescription: 'Movement, knee mobility, dhyana, and phone-usage reminders',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
+          sound: _androidTone,
           actions: <AndroidNotificationAction>[
             AndroidNotificationAction(
               snoozePhoneUsageActionId,
@@ -157,7 +188,7 @@ class NotificationService {
             ),
           ],
         ),
-        iOS: const DarwinNotificationDetails(),
+        iOS: _iosDetails,
       ),
     );
   }
@@ -172,6 +203,7 @@ class NotificationService {
     required int hour,
     required int minute,
     required NotificationPriorityTier priority,
+    String? payload,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
@@ -190,7 +222,7 @@ class NotificationService {
           NotificationPriorityTier.medium => _mediumPriorityAndroidDetails,
           NotificationPriorityTier.low => _lowPriorityAndroidDetails,
         },
-        iOS: const DarwinNotificationDetails(),
+        iOS: _iosDetails,
       ),
       // Inexact scheduling batches delivery into an OS-chosen window that
       // can run 30-60+ minutes past the target time, especially once the
@@ -202,6 +234,7 @@ class NotificationService {
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
+      payload: payload,
     );
   }
 

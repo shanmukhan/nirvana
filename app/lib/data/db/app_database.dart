@@ -21,13 +21,20 @@ class AppDatabase {
     final dbPath = join(dir.path, 'nirvana.db');
     return openDatabase(
       dbPath,
-      version: 1,
+      version: latestSchemaVersion,
       onCreate: (db, version) async {
         for (final statement in createTableStatements) {
           await db.execute(statement);
         }
         for (final statement in createIndexStatements) {
           await db.execute(statement);
+        }
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        for (var v = oldVersion; v < newVersion; v++) {
+          for (final statement in migrationStatements[v - 1]) {
+            await db.execute(statement);
+          }
         }
       },
     );

@@ -121,7 +121,44 @@ const List<String> createTableStatements = [
     snoozed_until TEXT
   )
   ''',
+  '''
+  CREATE TABLE desk_break_log (
+    id TEXT PRIMARY KEY,
+    desk_break_type TEXT NOT NULL,
+    log_date TEXT NOT NULL,
+    slot_hour INTEGER NOT NULL,
+    slot_minute INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    fired_at TEXT NOT NULL,
+    responded_at TEXT,
+    UNIQUE(desk_break_type, log_date, slot_hour, slot_minute)
+  )
+  ''',
 ];
+
+/// Statements to bring an existing database up to [latestSchemaVersion].
+/// Keyed by the version being migrated *to* — e.g. index 0 holds the
+/// statements that take a v1 database to v2.
+const List<List<String>> migrationStatements = [
+  [
+    '''
+    CREATE TABLE desk_break_log (
+      id TEXT PRIMARY KEY,
+      desk_break_type TEXT NOT NULL,
+      log_date TEXT NOT NULL,
+      slot_hour INTEGER NOT NULL,
+      slot_minute INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      fired_at TEXT NOT NULL,
+      responded_at TEXT,
+      UNIQUE(desk_break_type, log_date, slot_hour, slot_minute)
+    )
+    ''',
+    'CREATE INDEX idx_desk_break_log_log_date ON desk_break_log(log_date)',
+  ],
+];
+
+const int latestSchemaVersion = 2;
 
 const List<String> createIndexStatements = [
   'CREATE INDEX idx_weight_entry_taken_at ON weight_entry(taken_at)',
@@ -132,4 +169,5 @@ const List<String> createIndexStatements = [
   'CREATE INDEX idx_dhyana_session_date ON dhyana_session(date)',
   'CREATE INDEX idx_habit_completion_completed_at ON habit_completion(completed_at)',
   'CREATE INDEX idx_reminder_scheduled_for ON reminder(scheduled_for)',
+  'CREATE INDEX idx_desk_break_log_log_date ON desk_break_log(log_date)',
 ];

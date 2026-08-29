@@ -94,8 +94,58 @@ class _WaterBody extends ConsumerWidget {
               ),
           ],
         ),
+        const SizedBox(height: 20),
+        const _CustomAmountRow(),
         const SizedBox(height: 32),
         const _WeeklyConsistencyCard(),
+      ],
+    );
+  }
+}
+
+class _CustomAmountRow extends ConsumerStatefulWidget {
+  const _CustomAmountRow();
+
+  @override
+  ConsumerState<_CustomAmountRow> createState() => _CustomAmountRowState();
+}
+
+class _CustomAmountRowState extends ConsumerState<_CustomAmountRow> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _logCustomAmount() async {
+    final amount = int.tryParse(_controller.text.trim());
+    if (amount == null || amount <= 0) return;
+    await ref.read(waterRepositoryProvider).log(amount);
+    ref.read(waterRefreshProvider.notifier).state++;
+    _controller.clear();
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Custom amount (ml)',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _logCustomAmount(),
+          ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton(onPressed: _logCustomAmount, child: const Text('Log')),
       ],
     );
   }
