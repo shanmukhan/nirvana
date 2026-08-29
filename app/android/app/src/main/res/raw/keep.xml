@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Exempts nirvana_tone from Android's resource shrinker. Release builds run
+  R8 resource shrinking by default, and flutter_local_notifications looks
+  this file up by name at runtime (getIdentifier("nirvana_tone", "raw", ...))
+  rather than through a static R.raw.nirvana_tone reference, so the shrinker
+  can't see it's used and strips it — which crashed app startup with
+  PlatformException(invalid_sound, ...) in ReminderScheduler.rescheduleAll,
+  before runApp() ever ran (stuck-at-splash-screen bug, 2026-08-29).
+  See https://developer.android.com/build/shrink-code#keep-resources
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/nirvana_tone" />
