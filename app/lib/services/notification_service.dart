@@ -52,13 +52,18 @@ class NotificationService {
         sound: _androidTone,
       );
 
+  // v3: bumped from Importance.low to defaultImportance — Android channels
+  // below IMPORTANCE_DEFAULT are silent by OS design regardless of the
+  // `sound` field, so eye-distance/neck-exercise reminders never played a
+  // sound. Channel importance/sound is immutable once created on a device,
+  // hence the new channel id rather than editing nirvana_low_v2 in place.
   static const AndroidNotificationDetails _lowPriorityAndroidDetails =
       AndroidNotificationDetails(
-        'nirvana_low_v2',
+        'nirvana_low_v3',
         'Low priority reminders',
         channelDescription: 'Eye-distance and neck-exercise reminders',
-        importance: Importance.low,
-        priority: Priority.low,
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
         sound: _androidTone,
       );
 
