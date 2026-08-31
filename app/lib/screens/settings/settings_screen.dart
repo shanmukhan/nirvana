@@ -181,6 +181,46 @@ Future<int?> _pickTime(BuildContext context, int currentMinutes) async {
   return picked == null ? null : picked.hour * 60 + picked.minute;
 }
 
+/// Warns inline when a single-time reminder's chosen minute falls inside
+/// Quiet hours — previously that made the reminder silently never fire
+/// (see [ReminderScheduler]'s `_schedule*` methods, which skip scheduling
+/// entirely in that case) with nothing in the UI to explain why.
+class _QuietHoursConflictWarning extends StatelessWidget {
+  final int timeMinutes;
+
+  const _QuietHoursConflictWarning({required this.timeMinutes});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<QuietHoursWindow>(
+      future: QuietHoursWindow.load(),
+      builder: (context, snapshot) {
+        final window = snapshot.data;
+        if (window == null || !window.contains(timeMinutes)) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 16, color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  "This time is inside Quiet hours, so it won't fire — pick a "
+                  'different time, or adjust Quiet hours below.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Base card chrome shared by every reminder card: title, description,
 /// enable switch.
 class _ReminderCardShell extends StatelessWidget {
@@ -362,6 +402,7 @@ class _DhyanaReminderCardState extends State<_DhyanaReminderCard> {
             await ReminderScheduler.instance.rescheduleDhyana();
           },
         ),
+        _QuietHoursConflictWarning(timeMinutes: _timeMinutes),
       ],
     );
   }
@@ -421,6 +462,7 @@ class _KneeReminderCardState extends State<_KneeReminderCard> {
             await ReminderScheduler.instance.rescheduleKneeCheckin();
           },
         ),
+        _QuietHoursConflictWarning(timeMinutes: _timeMinutes),
       ],
     );
   }
@@ -480,6 +522,7 @@ class _WeightReminderCardState extends State<_WeightReminderCard> {
             await ReminderScheduler.instance.rescheduleWeightCheckin();
           },
         ),
+        _QuietHoursConflictWarning(timeMinutes: _timeMinutes),
       ],
     );
   }

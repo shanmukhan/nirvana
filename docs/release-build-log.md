@@ -187,3 +187,57 @@ generated files present — `android/app/src/main/res/drawable*/splash.png`
 `ios/Runner/Assets.xcassets/LaunchImage.imageset/*` — and present in a
 rebuilt release AAB (`unzip -l` showed `res/drawable-*/splash.png` and
 `android12splash.png` entries).
+
+## v1.0.8+8 (2026-08-31)
+
+**Command:** `flutter build appbundle --release` from `app/`.
+
+**Output:** `app/build/app/outputs/bundle/release/app-release.aab`
+(60.2MB), signed via `android/key.properties` →
+`/Users/shanmukhan/secrets/nirvana/upload-keystore.jks`. Confirmed via
+the merged release manifest
+(`build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml`):
+`package="com.nirvana.nirvana"`, `versionCode="8"`, `versionName="1.0.8"`.
+
+**Version bump:** was `1.0.7+7`; bumped to `1.0.8+8` (minor bump,
+`versionCode` +1) — this build adds user-facing features, same rule as
+the `1.0.5+5` bump above.
+
+**What's in this build:**
+
+- **Progress/History screen overhaul**: a new "Today's progress" card
+  (chronological timeline of everything logged today — water, meals,
+  exercise, dhyana, weight, knee check-ins, done desk breaks — each with
+  a time and short detail); Weight trend and Knee pain trend turned into
+  small tappable stat cards with a sparkline, each opening a new detail
+  page (`/progress/weight`, `/progress/knee`) with the full chart and
+  complete entry history; provider error states now show the actual
+  exception text instead of a bare `—`, plus pull-to-refresh, so a future
+  failure is diagnosable from the screen itself instead of silent.
+- **Quiet-hours conflict warning**: the Dhyana, Knee check-in, and Weight
+  check-in settings cards now warn inline when the chosen reminder time
+  falls inside the Quiet hours window — previously that silently
+  skipped scheduling with no indication why the reminder never fired.
+- **Per-category notification sounds**: Water, Dhyana, Knee (shared by
+  the daily check-in and the knee-mobility desk break), and Eye break
+  each now play a distinct custom tone (`nirvana_water_tone.wav`,
+  `nirvana_dhyana_tone.wav`, `nirvana_knee_tone.wav`,
+  `nirvana_eye_tone.wav` — synthesized short tones, no external audio
+  source) via their own Android channels (`nirvana_water_v1`,
+  `nirvana_dhyana_v1`, `nirvana_knee_v1`, `nirvana_eye_v1`) and iOS sound
+  files. Movement break, neck exercise, weight check-in, and the
+  phone-usage warning keep the original shared tone. Replaced the old
+  `NotificationPriorityTier` enum with `NotificationChannel`, which
+  carries the Android + iOS sound together per category.
+
+**Repeat of the Finding from v1.0.6+6**: the 4 new raw sound resources
+were added to `app/android/app/src/main/res/raw/keep.xml` up front (same
+R8-resource-shrinker risk as `nirvana_tone.wav` — looked up by name
+string at runtime, not a static `R.raw.*` reference) — confirmed via
+`unzip -l app-release.aab | grep res/raw` that all five tone files
+(`nirvana_tone`, `nirvana_water_tone`, `nirvana_dhyana_tone`,
+`nirvana_knee_tone`, `nirvana_eye_tone`) survived into the shipped
+bundle.
+
+**Verification:** `flutter analyze` and `flutter test` clean before
+building.

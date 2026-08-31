@@ -1,8 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/repositories/desk_break_log_repository.dart' show DeskBreakLogStatus;
 import '../domain/entities.dart';
+import '../domain/meal_templates.dart' show MealTypeLabel;
+import '../screens/exercise/exercise_screen.dart'
+    show exerciseDefinitionsProvider, exerciseRefreshProvider;
+import '../screens/food/food_screen.dart' show foodRefreshProvider;
 import '../screens/knee/knee_screen.dart' show kneeRefreshProvider;
 import '../screens/weight/weight_screen.dart' show weightRefreshProvider;
+import 'desk_break_providers.dart' show deskBreakLogRefreshProvider;
 import 'dhyana_providers.dart';
 import 'repository_providers.dart';
 import 'water_providers.dart';
@@ -85,4 +91,111 @@ final adherenceProvider = FutureProvider.autoDispose<List<DayAdherence>>((ref) a
     );
   }
   return result;
+});
+
+enum TodayActivityKind { water, meal, exercise, dhyana, weight, knee, deskBreak }
+
+/// One logged thing that happened today, for the Progress screen's
+/// "Today's progress" timeline.
+class TodayActivityEntry {
+  final DateTime time;
+  final TodayActivityKind kind;
+  final String title;
+  final String? subtitle;
+
+  const TodayActivityEntry({
+    required this.time,
+    required this.kind,
+    required this.title,
+    this.subtitle,
+  });
+}
+
+bool _isToday(DateTime d) {
+  final now = DateTime.now();
+  return d.year == now.year && d.month == now.month && d.day == now.day;
+}
+
+/// Everything logged today (water, meals, exercise, dhyana, weight, knee),
+/// newest first — see health-plan-source.md §18. Distinct from
+/// [adherenceProvider] (yes/no per habit per day): this is the actual
+/// chronological log of what happened today, with times.
+final todaysActivityProvider = FutureProvider.autoDispose<List<TodayActivityEntry>>((ref) async {
+  ref.watch(waterRefreshProvider);
+  ref.watch(foodRefreshProvider);
+  ref.watch(exerciseRefreshProvider);
+  ref.watch(dhyanaRefreshProvider);
+  ref.watch(weightRefreshProvider);
+  ref.watch(kneeRefreshProvider);
+  ref.watch(deskBreakLogRefreshProvider);
+
+  final today = DateTime.now();
+  final water = await ref.watch(waterRepositoryProvider).forDay(today);
+  final meals = await ref.watch(mealRepositoryProvider).forDay(today);
+  final exerciseSessions = await ref.watch(exerciseRepositoryProvider).forDay(today);
+  final exerciseDefinitions = await ref.watch(exerciseDefinitionsProvider.future);
+  final dhyanaSessions = await ref.watch(dhyanaRepositoryProvider).forDay(today);
+  final weightEntries = (await ref.watch(weightRepositoryProvider).recent(limit: 10))
+      .where((e) => _isToday(e.takenAt));
+  final painEntries = (await ref.watch(painRepositoryProvider).recent(limit: 10))
+      .where((e) => _isToday(e.recordedAt));
+  final deskBreaks = (await ref.watch(deskBreakLogRepositoryProvider).forDay(today))
+      .where((e) => e.status == DeskBreakLogStatus.done);
+
+  final exerciseNames = {for (final d in exerciseDefinitions) d.id: d.name};
+
+  final entries = <TodayActivityEntry>[
+    for (final w in water)
+      TodayActivityEntry(
+        time: w.loggedAt,
+        kind: TodayActivityKind.water,
+        title: 'Water',
+        subtitle: '${w.amountMl} ml',
+      ),
+    for (final m in meals)
+      TodayActivityEntry(
+        time: m.loggedAt,
+        kind: TodayActivityKind.meal,
+        title: m.mealType.label,
+        subtitle: m.description,
+      ),
+    for (final s in exerciseSessions)
+      TodayActivityEntry(
+        time: s.performedAt,
+        kind: TodayActivityKind.exercise,
+        title: exerciseNames[s.exerciseDefinitionId] ?? 'Exercise',
+        subtitle: '${s.completedSets} × ${s.completedReps}'
+            '${s.painRating0to10 != null ? '  ·  pain ${s.painRating0to10}/10' : ''}',
+      ),
+    for (final d in dhyanaSessions)
+      TodayActivityEntry(
+        time: d.date,
+        kind: TodayActivityKind.dhyana,
+        title: 'Dhyana',
+        subtitle: '${d.actualDurationMin} min',
+      ),
+    for (final w in weightEntries)
+      TodayActivityEntry(
+        time: w.takenAt,
+        kind: TodayActivityKind.weight,
+        title: 'Weight',
+        subtitle: '${w.weightKg.toStringAsFixed(1)} kg',
+      ),
+    for (final p in painEntries)
+      TodayActivityEntry(
+        time: p.recordedAt,
+        kind: TodayActivityKind.knee,
+        title: 'Knee check-in',
+        subtitle: 'Pain ${p.painBefore0to10}/10',
+      ),
+    for (final d in deskBreaks)
+      TodayActivityEntry(
+        time: d.respondedAt ?? d.firedAt,
+        kind: TodayActivityKind.deskBreak,
+        title: d.type.label,
+        subtitle: 'Done',
+      ),
+  ];
+  entries.sort((a, b) => b.time.compareTo(a.time));
+  return entries;
 });

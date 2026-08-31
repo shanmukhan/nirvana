@@ -17,11 +17,12 @@ class NotificationService {
   bool _initialized = false;
 
   /// Resource name (Android `res/raw`, no extension) / bundled file name
-  /// (iOS, with extension) for the custom "Nirvana" reminder tone. Android
-  /// notification-channel sound is immutable once a channel with a given
-  /// id has been created on a device, so switching a channel's sound
-  /// requires a brand-new channel id — hence `_v2` here rather than
-  /// reusing `nirvana_high`/`nirvana_medium`/`nirvana_low`. The old
+  /// (iOS, with extension) for the generic "Nirvana" reminder tone, used by
+  /// every reminder that doesn't have its own distinct sound (see
+  /// [NotificationChannel]). Android notification-channel sound is
+  /// immutable once a channel with a given id has been created on a
+  /// device, so switching a channel's sound requires a brand-new channel
+  /// id — hence `_v2`/`_v3` here rather than reusing earlier ids. The old
   /// channel ids are simply no longer scheduled against; a user who
   /// already had them created keeps them as an orphaned, unused channel
   /// (Android gives apps no way to delete another app's existing
@@ -36,7 +37,7 @@ class NotificationService {
       AndroidNotificationDetails(
         'nirvana_high_v2',
         'High priority reminders',
-        channelDescription: 'Hydration and scheduled exercise reminders',
+        channelDescription: 'Scheduled exercise reminders',
         importance: Importance.high,
         priority: Priority.high,
         sound: _androidTone,
@@ -46,7 +47,7 @@ class NotificationService {
       AndroidNotificationDetails(
         'nirvana_medium_v2',
         'Medium priority reminders',
-        channelDescription: 'Movement, knee mobility, and dhyana reminders',
+        channelDescription: 'Movement and neck-exercise reminders, phone-usage warnings',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
         sound: _androidTone,
@@ -61,7 +62,7 @@ class NotificationService {
       AndroidNotificationDetails(
         'nirvana_low_v3',
         'Low priority reminders',
-        channelDescription: 'Eye-distance and neck-exercise reminders',
+        channelDescription: 'Weigh-in reminders',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
         sound: _androidTone,
@@ -69,6 +70,60 @@ class NotificationService {
 
   static const DarwinNotificationDetails _iosDetails = DarwinNotificationDetails(
     sound: _iosTone,
+  );
+
+  // Water, Dhyana, Knee (check-in + mobility break), and Eye break each get
+  // their own channel/sound so they're distinguishable by ear without
+  // looking at the phone — same immutable-once-created channel-id rule as
+  // above applies, so any future sound change needs a new `_v1` -> `_v2`.
+  static const AndroidNotificationDetails _waterAndroidDetails = AndroidNotificationDetails(
+    'nirvana_water_v1',
+    'Water reminders',
+    channelDescription: 'Hydration reminders',
+    importance: Importance.high,
+    priority: Priority.high,
+    sound: RawResourceAndroidNotificationSound('nirvana_water_tone'),
+  );
+  static const DarwinNotificationDetails _waterIosDetails = DarwinNotificationDetails(
+    sound: 'nirvana_water_tone.wav',
+  );
+
+  static const AndroidNotificationDetails _dhyanaAndroidDetails = AndroidNotificationDetails(
+    'nirvana_dhyana_v1',
+    'Dhyana reminders',
+    channelDescription: 'Meditation practice reminders',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    sound: RawResourceAndroidNotificationSound('nirvana_dhyana_tone'),
+  );
+  static const DarwinNotificationDetails _dhyanaIosDetails = DarwinNotificationDetails(
+    sound: 'nirvana_dhyana_tone.wav',
+  );
+
+  /// Shared by the daily Knee check-in and the Knee-mobility desk break —
+  /// both are "knee" reminders to the user, so both get the same sound.
+  static const AndroidNotificationDetails _kneeAndroidDetails = AndroidNotificationDetails(
+    'nirvana_knee_v1',
+    'Knee reminders',
+    channelDescription: 'Knee check-in and knee mobility break reminders',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    sound: RawResourceAndroidNotificationSound('nirvana_knee_tone'),
+  );
+  static const DarwinNotificationDetails _kneeIosDetails = DarwinNotificationDetails(
+    sound: 'nirvana_knee_tone.wav',
+  );
+
+  static const AndroidNotificationDetails _eyeAndroidDetails = AndroidNotificationDetails(
+    'nirvana_eye_v1',
+    'Eye break reminders',
+    channelDescription: 'Eye-distance break reminders',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    sound: RawResourceAndroidNotificationSound('nirvana_eye_tone'),
+  );
+  static const DarwinNotificationDetails _eyeIosDetails = DarwinNotificationDetails(
+    sound: 'nirvana_eye_tone.wav',
   );
 
   /// Action id for the "Snooze" button on the continuous-phone-usage
@@ -148,19 +203,15 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
-    required NotificationPriorityTier priority,
+    required NotificationChannel channel,
   }) async {
     await _plugin.show(
       id: id,
       title: title,
       body: body,
       notificationDetails: NotificationDetails(
-        android: switch (priority) {
-          NotificationPriorityTier.high => _highPriorityAndroidDetails,
-          NotificationPriorityTier.medium => _mediumPriorityAndroidDetails,
-          NotificationPriorityTier.low => _lowPriorityAndroidDetails,
-        },
-        iOS: _iosDetails,
+        android: channel._androidDetails,
+        iOS: channel._iosDetails,
       ),
     );
   }
@@ -182,7 +233,7 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'nirvana_medium_v2',
           'Medium priority reminders',
-          channelDescription: 'Movement, knee mobility, dhyana, and phone-usage reminders',
+          channelDescription: 'Movement and neck-exercise reminders, phone-usage warnings',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
           sound: _androidTone,
@@ -207,7 +258,7 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
-    required NotificationPriorityTier priority,
+    required NotificationChannel channel,
     String? payload,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
@@ -222,12 +273,8 @@ class NotificationService {
       body: body,
       scheduledDate: scheduled,
       notificationDetails: NotificationDetails(
-        android: switch (priority) {
-          NotificationPriorityTier.high => _highPriorityAndroidDetails,
-          NotificationPriorityTier.medium => _mediumPriorityAndroidDetails,
-          NotificationPriorityTier.low => _lowPriorityAndroidDetails,
-        },
-        iOS: _iosDetails,
+        android: channel._androidDetails,
+        iOS: channel._iosDetails,
       ),
       // Inexact scheduling batches delivery into an OS-chosen window that
       // can run 30-60+ minutes past the target time, especially once the
@@ -248,4 +295,24 @@ class NotificationService {
   Future<void> cancelAll() => _plugin.cancelAll();
 }
 
-enum NotificationPriorityTier { high, medium, low }
+/// Which channel/sound a reminder plays through. Water, Dhyana, Knee (both
+/// the check-in and the mobility break), and Eye break each get their own
+/// distinct sound so they're recognizable by ear; everything else uses one
+/// of the three generic priority-tier channels/sounds.
+enum NotificationChannel {
+  water(NotificationService._waterAndroidDetails, NotificationService._waterIosDetails),
+  dhyana(NotificationService._dhyanaAndroidDetails, NotificationService._dhyanaIosDetails),
+  knee(NotificationService._kneeAndroidDetails, NotificationService._kneeIosDetails),
+  eye(NotificationService._eyeAndroidDetails, NotificationService._eyeIosDetails),
+  genericHigh(NotificationService._highPriorityAndroidDetails, NotificationService._iosDetails),
+  genericMedium(
+    NotificationService._mediumPriorityAndroidDetails,
+    NotificationService._iosDetails,
+  ),
+  genericLow(NotificationService._lowPriorityAndroidDetails, NotificationService._iosDetails);
+
+  final AndroidNotificationDetails _androidDetails;
+  final DarwinNotificationDetails _iosDetails;
+
+  const NotificationChannel(this._androidDetails, this._iosDetails);
+}

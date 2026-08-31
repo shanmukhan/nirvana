@@ -17,6 +17,10 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		AAB80E46653094E19C9E1F7E /* nirvana_tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = EDCA4DA6B5BF8DED3C6A9E52 /* nirvana_tone.wav */; };
+		2D43A51E2A5741DD9ACC4FD2 /* nirvana_water_tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5C7084F1DCDD40A78B33BE1C /* nirvana_water_tone.wav */; };
+		03725CE010BF4A9C9BB03491 /* nirvana_dhyana_tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = 36D931CD57AB4AC08870FF43 /* nirvana_dhyana_tone.wav */; };
+		615CA6E4EB1E40058B2E2807 /* nirvana_knee_tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = 67A23D83920C42D09A0A56F4 /* nirvana_knee_tone.wav */; };
+		C52349EC566E4A72A46102C7 /* nirvana_eye_tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = 97A805BDA0E447C5A1110B02 /* nirvana_eye_tone.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +65,10 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EDCA4DA6B5BF8DED3C6A9E52 /* nirvana_tone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = nirvana_tone.wav; path = Resources/nirvana_tone.wav; sourceTree = "<group>"; };
+		5C7084F1DCDD40A78B33BE1C /* nirvana_water_tone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = nirvana_water_tone.wav; path = Resources/nirvana_water_tone.wav; sourceTree = "<group>"; };
+		36D931CD57AB4AC08870FF43 /* nirvana_dhyana_tone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = nirvana_dhyana_tone.wav; path = Resources/nirvana_dhyana_tone.wav; sourceTree = "<group>"; };
+		67A23D83920C42D09A0A56F4 /* nirvana_knee_tone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = nirvana_knee_tone.wav; path = Resources/nirvana_knee_tone.wav; sourceTree = "<group>"; };
+		97A805BDA0E447C5A1110B02 /* nirvana_eye_tone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = nirvana_eye_tone.wav; path = Resources/nirvana_eye_tone.wav; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +135,10 @@
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				EDCA4DA6B5BF8DED3C6A9E52 /* nirvana_tone.wav */,
+				5C7084F1DCDD40A78B33BE1C /* nirvana_water_tone.wav */,
+				36D931CD57AB4AC08870FF43 /* nirvana_dhyana_tone.wav */,
+				67A23D83920C42D09A0A56F4 /* nirvana_knee_tone.wav */,
+				97A805BDA0E447C5A1110B02 /* nirvana_eye_tone.wav */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -233,6 +245,10 @@
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
 				AAB80E46653094E19C9E1F7E /* nirvana_tone.wav in Resources */,
+				2D43A51E2A5741DD9ACC4FD2 /* nirvana_water_tone.wav in Resources */,
+				03725CE010BF4A9C9BB03491 /* nirvana_dhyana_tone.wav in Resources */,
+				615CA6E4EB1E40058B2E2807 /* nirvana_knee_tone.wav in Resources */,
+				C52349EC566E4A72A46102C7 /* nirvana_eye_tone.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -163,7 +163,7 @@ class ReminderScheduler {
         body: 'A glass of water keeps you on track for today\'s goal.',
         hour: hour,
         minute: minute,
-        priority: NotificationPriorityTier.high,
+        channel: NotificationChannel.water,
         payload: 'water',
       );
     }
@@ -179,7 +179,7 @@ class ReminderScheduler {
       body: 'A few quiet minutes for your practice.',
       hour: minutes ~/ 60,
       minute: minutes % 60,
-      priority: NotificationPriorityTier.medium,
+      channel: NotificationChannel.dhyana,
     );
   }
 
@@ -193,7 +193,7 @@ class ReminderScheduler {
       body: 'How does your knee feel today? Log pain, swelling, and stiffness.',
       hour: minutes ~/ 60,
       minute: minutes % 60,
-      priority: NotificationPriorityTier.medium,
+      channel: NotificationChannel.knee,
     );
   }
 
@@ -207,7 +207,7 @@ class ReminderScheduler {
       body: 'Log today\'s weight to keep your trend up to date.',
       hour: minutes ~/ 60,
       minute: minutes % 60,
-      priority: NotificationPriorityTier.low,
+      channel: NotificationChannel.genericLow,
     );
   }
 
@@ -228,9 +228,11 @@ class ReminderScheduler {
         body: _deskBreakBody(type),
         hour: hour,
         minute: minute,
-        priority: type == DeskBreakType.eye
-            ? NotificationPriorityTier.low
-            : NotificationPriorityTier.medium,
+        channel: switch (type) {
+          DeskBreakType.eye => NotificationChannel.eye,
+          DeskBreakType.kneeMobility => NotificationChannel.knee,
+          DeskBreakType.movement || DeskBreakType.neck => NotificationChannel.genericMedium,
+        },
         payload: 'deskbreak:${type.name}:$hour:$minute',
       );
     }

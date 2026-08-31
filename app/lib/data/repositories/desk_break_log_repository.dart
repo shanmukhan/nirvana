@@ -98,6 +98,33 @@ class DeskBreakLogRepository {
     if (any) await batch.commit(noResult: true);
   }
 
+  /// Logged responses for [day], newest first — used by the Progress
+  /// screen's "Today's progress" timeline.
+  Future<List<DeskBreakLogEntry>> forDay(DateTime day) async {
+    final rows = await _db.query(
+      'desk_break_log',
+      where: 'log_date = ?',
+      whereArgs: [_dateKey(day)],
+      orderBy: 'fired_at DESC',
+    );
+    return rows
+        .map(
+          (row) => DeskBreakLogEntry(
+            id: row['id'] as String,
+            type: DeskBreakType.values.byName(row['desk_break_type'] as String),
+            logDate: day,
+            slotHour: row['slot_hour'] as int,
+            slotMinute: row['slot_minute'] as int,
+            status: DeskBreakLogStatus.values.byName(row['status'] as String),
+            firedAt: DateTime.parse(row['fired_at'] as String),
+            respondedAt: row['responded_at'] == null
+                ? null
+                : DateTime.parse(row['responded_at'] as String),
+          ),
+        )
+        .toList();
+  }
+
   /// Per-type counts of done/skipped/autoMissed over the last [days] days
   /// (today inclusive), for the Desk Breaks adherence summary.
   Future<Map<DeskBreakType, Map<DeskBreakLogStatus, int>>> adherenceSummary(int days) async {
