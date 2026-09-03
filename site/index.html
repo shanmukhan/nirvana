@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nirvana — Gentle daily habits</title>
+<meta name="description" content="Nirvana is a gentle daily companion for hydration, knee care, meditation, exercise, meals, weight, sleep, and desk breaks — fully offline, no account, no data leaves your device.">
+<link rel="icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf8f3;
+    --fg: #1c2321;
+    --muted: #5a6560;
+    --card: #ffffff;
+    --card-border: #e7e2d5;
+    --border: #e7e2d5;
+    --moss: #2e7d5b;
+    --moss-2: #4fa87f;
+    --clay: #c07a3e;
+    --clay-2: #e3a566;
+    --accent-fg: #f4fbf6;
+    --glow-1: #4fa87f;
+    --glow-2: #e3a566;
+    --glow-3: #6fb5c9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1310;
+      --fg: #edf3ee;
+      --muted: #a3afa8;
+      --card: #151b16;
+      --card-border: #253028;
+      --border: #253028;
+      --moss: #5ecb95;
+      --moss-2: #7fdaac;
+      --clay: #e3a566;
+      --clay-2: #f0c08d;
+      --accent-fg: #08140d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.65;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .brand-word { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.01em; }
+  a { color: inherit; }
+  img { display: block; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 1.5rem; position: relative; }
+
+  /* ---------- background decoration ---------- */
+  .glow-field { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(95px); opacity: 0.26; }
+  @media (prefers-color-scheme: dark) { .blob { opacity: 0.2; } }
+  .blob-1 { width: 520px; height: 520px; top: -180px; left: -120px; background: var(--glow-1); }
+  .blob-2 { width: 460px; height: 460px; top: 40px; right: -170px; background: var(--glow-3); }
+  .blob-3 { width: 420px; height: 420px; bottom: -230px; left: 32%; background: var(--glow-2); opacity: 0.16; }
+
+  /* ---------- nav ---------- */
+  header.nav {
+    position: sticky; top: 0; z-index: 40;
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease;
+  }
+  header.nav.scrolled { border-bottom-color: var(--border); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 0; }
+  .brand { display: flex; align-items: center; gap: 0.65rem; font-weight: 700; font-size: 1.1rem; font-family: 'Fraunces', serif; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; box-shadow: 0 4px 14px -4px rgba(0,0,0,0.35); }
+  nav.links { display: flex; align-items: center; gap: 1.75rem; font-size: 0.92rem; color: var(--muted); font-weight: 600; }
+  nav.links a { text-decoration: none; transition: color 0.15s ease; }
+  nav.links a:hover { color: var(--fg); }
+  .nav-cta { padding: 0.5rem 1.1rem; border-radius: 8px; background: var(--fg); color: var(--bg); font-weight: 700; font-size: 0.85rem; }
+
+  /* ---------- buttons / badges ---------- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.85rem 1.5rem; border-radius: 12px; font-weight: 700;
+    text-decoration: none; font-size: 0.97rem; border: 1px solid transparent;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--moss) 0%, var(--moss-2) 100%);
+    color: var(--accent-fg);
+    box-shadow: 0 10px 30px -10px color-mix(in srgb, var(--moss) 65%, transparent);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -12px color-mix(in srgb, var(--moss) 70%, transparent); }
+  .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+  .btn-secondary:hover { border-color: var(--fg); }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 2.5rem 0 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    font-size: 0.82rem; font-weight: 600; color: var(--muted);
+    background: var(--card); border: 1px solid var(--card-border);
+    padding: 0.42rem 0.85rem; border-radius: 999px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-size: 0.82rem; font-weight: 700; color: var(--moss);
+    background: color-mix(in srgb, var(--moss) 12%, var(--bg));
+    border: 1px solid color-mix(in srgb, var(--moss) 30%, transparent);
+    padding: 0.4rem 0.85rem; border-radius: 999px; margin-bottom: 1.5rem;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); flex: none; }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 4.5rem 0 3.5rem; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 3rem; align-items: center; }
+  .hero h1 { font-size: 3.05rem; line-height: 1.06; margin: 0 0 1.25rem; letter-spacing: -0.02em; font-weight: 700; }
+  .hero h1 .accent {
+    background: linear-gradient(100deg, var(--moss) 10%, var(--clay) 90%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lead { font-size: 1.15rem; color: var(--muted); margin: 0 0 2rem; max-width: 46ch; font-family: 'Manrope', sans-serif; }
+  .cta-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+  /* ---------- phone mockups ---------- */
+  .hero-shots { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 1.4rem; padding: 1rem 0; }
+  .phone {
+    position: relative; width: 45%; max-width: 230px; aspect-ratio: 9 / 19.5;
+    border-radius: 34px; background: #0c0d10; padding: 10px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5), 0 10px 20px -8px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.06);
+    transition: transform 0.4s cubic-bezier(.2,.8,.2,1);
+  }
+  .phone.tilt-left { transform: rotate(-6deg) translateY(14px); }
+  .phone.tilt-right { transform: rotate(5deg) translateY(-10px); }
+  .phone:hover { transform: rotate(0deg) translateY(-6px) scale(1.03); }
+  .phone-screen { width: 100%; height: 100%; border-radius: 24px; overflow: hidden; position: relative; background: #000; }
+  .phone-screen img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .phone-notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 34%; height: 18px; background: #0c0d10; border-radius: 0 0 14px 14px; z-index: 2;
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: 5rem 0; position: relative; }
+  .section-head { max-width: 640px; margin: 0 auto 3rem; text-align: center; }
+  section h2 { font-size: 2.1rem; margin: 0 0 0.75rem; letter-spacing: -0.02em; font-weight: 700; }
+  section p.section-lead { color: var(--muted); margin: 0; font-size: 1.05rem; font-family: 'Manrope', sans-serif; }
+  .kicker { display: block; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); margin-bottom: 0.75rem; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
+  .card {
+    position: relative; background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 16px; padding: 1.6rem 1.5rem;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(280px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--moss) 14%, transparent), transparent 70%);
+    opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -20px rgba(0,0,0,0.28); border-color: color-mix(in srgb, var(--moss) 35%, var(--card-border)); }
+  .card:hover::before { opacity: 1; }
+  .card-icon {
+    width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; margin-bottom: 1rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--moss) 22%, var(--card)), color-mix(in srgb, var(--clay) 18%, var(--card)));
+    border: 1px solid var(--card-border);
+  }
+  .card h3 { margin: 0 0 0.4rem; font-size: 1.03rem; font-weight: 600; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; font-family: 'Manrope', sans-serif; }
+
+  /* ---------- screenshots strip ---------- */
+  .shots-section { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .shots {
+    display: flex; gap: 1.5rem; overflow-x: auto; padding: 0.5rem 1.5rem 1.5rem;
+    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+    max-width: 1120px; margin: 0 auto;
+  }
+  .shots::-webkit-scrollbar { height: 8px; }
+  .shots::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  .shot-frame {
+    flex: 0 0 auto; scroll-snap-align: start; padding: 10px; border-radius: 24px;
+    background: linear-gradient(160deg, var(--card), color-mix(in srgb, var(--moss) 8%, var(--card)));
+    border: 1px solid var(--card-border); box-shadow: 0 8px 20px -10px rgba(28,35,33,0.22);
+  }
+  .shots img { display: block; height: 440px; border-radius: 16px; }
+
+  /* ---------- philosophy / privacy block ---------- */
+  .privacy-block { display: grid; grid-template-columns: 1fr 0.9fr; gap: 3rem; align-items: center; }
+  .privacy-list { list-style: none; margin: 0; padding: 0; }
+  .privacy-list li {
+    display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.1rem;
+    color: var(--muted); font-size: 0.98rem; font-family: 'Manrope', sans-serif;
+  }
+  .check {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    background: color-mix(in srgb, var(--moss) 18%, var(--bg)); color: var(--moss);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; margin-top: 0.15rem; font-weight: 700;
+  }
+  .privacy-card {
+    background: linear-gradient(160deg, color-mix(in srgb, var(--moss) 10%, var(--card)), var(--card));
+    border: 1px solid var(--card-border); border-radius: 20px; padding: 2.25rem;
+    box-shadow: 0 24px 50px -28px rgba(0,0,0,0.35);
+  }
+  .privacy-card .lock {
+    width: 54px; height: 54px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--moss), var(--moss-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; margin-bottom: 1.25rem;
+    box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--moss) 60%, transparent);
+  }
+  .privacy-card strong { display: block; font-size: 1.15rem; margin-bottom: 0.5rem; font-family: 'Fraunces', serif; }
+  .privacy-card p { margin: 0; color: var(--muted); font-size: 0.95rem; font-family: 'Manrope', sans-serif; }
+
+  /* ---------- CTA ---------- */
+  .cta-card {
+    max-width: 640px; margin: 0 auto; text-align: center;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--moss) 10%, var(--card)), var(--card));
+    border: 1px solid var(--card-border); border-radius: 22px; padding: 3rem 2rem;
+    box-shadow: 0 24px 50px -28px rgba(0,0,0,0.35);
+  }
+  .cta-card h2 { margin: 0 0 0.6rem; font-size: 1.6rem; }
+  .cta-card p { color: var(--muted); margin: 0 auto 1.5rem; max-width: 26rem; font-family: 'Manrope', sans-serif; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 700;
+    color: var(--moss); background: var(--bg); border: 1px solid var(--card-border);
+    padding: 0.6rem 1.1rem; border-radius: 999px;
+  }
+  .status-pill .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--moss);
+    animation: pulse 2.2s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--moss) 45%, transparent); }
+    70%  { box-shadow: 0 0 0 9px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--border); padding: 2.5rem 0 2.75rem; color: var(--muted); font-size: 0.88rem; }
+  .footer-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.9rem; }
+  .footer-brand { display: flex; align-items: center; gap: 0.55rem; font-weight: 700; color: var(--fg); font-family: 'Fraunces', serif; }
+  .footer-brand img { width: 22px; height: 22px; border-radius: 6px; }
+  footer a { text-decoration: none; border-bottom: 1px solid var(--border); padding-bottom: 1px; }
+  footer a:hover { border-color: var(--fg); }
+
+  /* ---------- reveal-on-scroll ---------- */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 2.5rem; text-align: center; }
+    .hero .cta-row, .pill-row { justify-content: center; }
+    .hero p.lead { margin-left: auto; margin-right: auto; }
+    .hero-shots { order: -1; margin-bottom: 1rem; }
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .privacy-block { grid-template-columns: 1fr; }
+    nav.links a:not(.nav-cta) { display: none; }
+    .hero h1 { font-size: 2.25rem; }
+  }
+  @media (max-width: 520px) {
+    .grid { grid-template-columns: 1fr; }
+    .phone { max-width: 150px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-field">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<header class="nav" id="siteNav">
+  <div class="wrap nav-inner">
+    <div class="brand"><img src="img/icon.png" alt="Nirvana icon"> Nirvana</div>
+    <nav class="links">
+      <a href="#features">Features</a>
+      <a href="#philosophy">Philosophy</a>
+      <a href="/privacy-policy">Privacy Policy</a>
+      <a class="nav-cta" href="#features">Explore</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="hero">
+    <div>
+      <span class="badge"><span class="dot"></span> Local-first &middot; no account, works fully offline</span>
+      <h1>Gentle daily habits, <span class="accent">without the guilt.</span></h1>
+      <p class="lead">Hydration, knee &amp; joint care, meditation, exercise, meals, weight, and desk breaks — one quiet companion, built around consistency over perfection.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#features">See what it does</a>
+        <a class="btn btn-secondary" href="/privacy-policy">Read the privacy policy</a>
+      </div>
+      <div class="pill-row">
+        <span class="pill">📴 Works fully offline</span>
+        <span class="pill">🙅 No account needed</span>
+        <span class="pill">🚫 Zero tracking</span>
+      </div>
+    </div>
+    <div class="hero-shots">
+      <div class="phone tilt-left">
+        <div class="phone-notch"></div>
+        <div class="phone-screen"><img src="img/01_dashboard.png" alt="Nirvana dashboard screen"></div>
+      </div>
+      <div class="phone tilt-right">
+        <div class="phone-notch"></div>
+        <div class="phone-screen"><img src="img/09_dhyana.png" alt="Nirvana meditation screen"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="section-head reveal">
+      <span class="kicker">What's inside</span>
+      <h2>What Nirvana helps with</h2>
+      <p class="section-lead">Eight quiet companions for one simple goal: showing up a little bit, every day.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal">
+        <div class="card-icon">💧</div>
+        <h3>Hydration</h3>
+        <p>Quick-log buttons, a daily progress ring, and reminders that ease off automatically as bedtime approaches.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">🦵</div>
+        <h3>Knee &amp; joint care</h3>
+        <p>Log pain, swelling, and stiffness in seconds. Nirvana gently suggests seeing a professional when warning signs show up — never to push through pain.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">🧘</div>
+        <h3>Dhyana (meditation)</h3>
+        <p>A soft, distraction-free timer with a start and end bell. Breath awareness, body scan, or simple counting.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">🏋️</div>
+        <h3>Exercise</h3>
+        <p>Guided knee-friendly strength sessions with sets, reps, timers, and a pain check-in after every session.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">🍽️</div>
+        <h3>Food</h3>
+        <p>Simple meal logging against sensible portion templates with a rough protein estimate — no calorie obsession.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">⚖️</div>
+        <h3>Weight</h3>
+        <p>Log weigh-ins and see your 7-day average and trend, because a single day's number is noise.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">🖥️</div>
+        <h3>Desk breaks</h3>
+        <p>Quiet, configurable nudges to look away, stand up, and move your knees and neck during long screen time.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon">📈</div>
+        <h3>Progress</h3>
+        <p>See your trends across weight, pain, and consistency over time.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<section class="shots-section">
+  <div class="section-head wrap reveal">
+    <span class="kicker">Inside the app</span>
+    <h2>A look inside</h2>
+  </div>
+  <div class="shots">
+    <div class="shot-frame"><img src="img/01_dashboard.png" alt="Nirvana dashboard screen"></div>
+    <div class="shot-frame"><img src="img/03_water.png" alt="Hydration tracking screen"></div>
+    <div class="shot-frame"><img src="img/07_knee.png" alt="Knee and joint care screen"></div>
+    <div class="shot-frame"><img src="img/09_dhyana.png" alt="Meditation timer screen"></div>
+    <div class="shot-frame"><img src="img/08_desk_breaks.png" alt="Desk break reminder screen"></div>
+    <div class="shot-frame"><img src="img/10_progress_history.png" alt="Progress history screen"></div>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <section id="philosophy">
+    <div class="privacy-block">
+      <div class="reveal">
+        <span class="kicker">Philosophy</span>
+        <h2>Consistency, not perfection</h2>
+        <p class="section-lead" style="margin-bottom: 1.75rem;">Nirvana is built around one simple idea: a good day isn't a perfect diet and a punishing workout — it's staying hydrated, moving a little, and showing up again tomorrow.</p>
+        <ul class="privacy-list">
+          <li><span class="check">✓</span> No shame, ever. Missed a day? That's fine — tomorrow is still there.</li>
+          <li><span class="check">✓</span> Your data stays on your device. Nirvana has no backend and makes no network requests.</li>
+          <li><span class="check">✓</span> Every schedule is yours to configure — reminder times, intervals, and goals aren't locked in.</li>
+          <li><span class="check">✓</span> Nirvana never diagnoses or treats any condition — a lifestyle companion, not a medical device.</li>
+        </ul>
+      </div>
+      <div class="privacy-card reveal">
+        <div class="lock">🌿</div>
+        <strong>Nirvana has no backend and makes no network requests.</strong>
+        <p>Everything you log — hydration, pain check-ins, meditation sessions, meals, weight, and reminders — stays in a local database on your device only.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="cta-card reveal">
+      <h2>Coming soon</h2>
+      <p>Nirvana is being polished for its first release. Check back here for the Play Store link.</p>
+      <span class="status-pill"><span class="pulse"></span>Not yet on the Play Store</span>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap footer-inner">
+    <div class="footer-brand"><img src="img/icon.png" alt="Nirvana icon"> &copy; 2026 Nirvana</div>
+    <div><a href="/privacy-policy">Privacy Policy</a> &middot; <a href="mailto:shanmukhan.b@gmail.com">Contact</a></div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var nav = document.getElementById('siteNav');
+    window.addEventListener('scroll', function () {
+      nav.classList.toggle('scrolled', window.scrollY > 8);
+    }, { passive: true });
+
+    var els = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-visible');
+            io.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      els.forEach(function (el) { io.observe(el); });
+    } else {
+      els.forEach(function (el) { el.classList.add('is-visible'); });
+    }
+
+    document.querySelectorAll('.card').forEach(function (card) {
+      card.addEventListener('mousemove', function (e) {
+        var r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
