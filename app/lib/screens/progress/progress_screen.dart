@@ -19,7 +19,7 @@ class ProgressScreen extends ConsumerWidget {
       title: 'Progress / History',
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(todaysActivityProvider);
+          ref.invalidate(dayActivityProvider);
           ref.invalidate(weightTrendProvider);
           ref.invalidate(painTrendProvider);
           ref.invalidate(adherenceProvider);
@@ -63,7 +63,8 @@ class _TodayProgressCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activityAsync = ref.watch(todaysActivityProvider);
+    final today = DateTime.now();
+    final activityAsync = ref.watch(dayActivityProvider(today));
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -73,34 +74,51 @@ class _TodayProgressCard extends ConsumerWidget {
             Text("Today's progress", style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              DateFormat('EEEE, MMM d').format(DateTime.now()),
+              DateFormat('EEEE, MMM d').format(today),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
-            activityAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => _ErrorLine(e),
-              data: (entries) {
-                if (entries.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text('Nothing logged yet today — it\'ll show up here as you go.'),
-                  );
-                }
-                return Column(
-                  children: [
-                    for (var i = 0; i < entries.length; i++)
-                      _TodayActivityTile(entry: entries[i], showDivider: i != entries.length - 1),
-                  ],
-                );
-              },
+            _DayActivityList(
+              activityAsync: activityAsync,
+              emptyMessage: 'Nothing logged yet today — it\'ll show up here as you go.',
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Shared "list of things logged that day" body, used by both the Today
+/// card and the per-date drilldown reached from the adherence grid.
+class _DayActivityList extends StatelessWidget {
+  final AsyncValue<List<TodayActivityEntry>> activityAsync;
+  final String emptyMessage;
+
+  const _DayActivityList({required this.activityAsync, required this.emptyMessage});
+
+  @override
+  Widget build(BuildContext context) {
+    return activityAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => _ErrorLine(e),
+      data: (entries) {
+        if (entries.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(emptyMessage),
+          );
+        }
+        return Column(
+          children: [
+            for (var i = 0; i < entries.length; i++)
+              _TodayActivityTile(entry: entries[i], showDivider: i != entries.length - 1),
+          ],
+        );
+      },
     );
   }
 }
@@ -350,12 +368,17 @@ class _AdherenceGrid extends StatelessWidget {
           children: [
             const SizedBox(),
             for (final day in days)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Center(
-                  child: Text(
-                    DateFormat.E().format(day.day).substring(0, 1),
-                    style: Theme.of(context).textTheme.labelSmall,
+              InkWell(
+                onTap: () => context.push(
+                  '/progress/day/${DateFormat('yyyy-MM-dd').format(day.day)}',
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Center(
+                    child: Text(
+                      DateFormat.E().format(day.day).substring(0, 1),
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
                   ),
                 ),
               ),
@@ -506,6 +529,31 @@ class KneeTrendDetailScreen extends StatelessWidget {
       yMax: 10,
       valueLabel: (e) => 'Pain: ${e.painBefore0to10}/10',
       timeLabel: (e) => DateFormat('EEE, MMM d · h:mm a').format(e.recordedAt),
+    );
+  }
+}
+
+/// Registered at /progress/day/:date — everything logged on one past (or
+/// present) date, reached by tapping a day in the adherence grid.
+class DayActivityScreen extends ConsumerWidget {
+  final DateTime day;
+
+  const DayActivityScreen({super.key, required this.day});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activityAsync = ref.watch(dayActivityProvider(day));
+    return Scaffold(
+      appBar: AppBar(title: Text(DateFormat('EEEE, MMM d').format(day))),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _DayActivityList(
+            activityAsync: activityAsync,
+            emptyMessage: 'Nothing was logged on this day.',
+          ),
+        ],
+      ),
     );
   }
 }

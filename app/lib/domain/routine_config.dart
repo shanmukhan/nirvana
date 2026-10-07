@@ -51,7 +51,7 @@ class HydrationConfig {
       HydrationSlot(time: TimeOfDayConfig(19, 0), minMl: 250, maxMl: 250),
       HydrationSlot(time: TimeOfDayConfig(20, 30), minMl: 150, maxMl: 250),
     ],
-    this.quickLogAmountsMl = const [150, 250, 300, 500],
+    this.quickLogAmountsMl = const [100, 150, 250, 300],
   });
 
   /// Only `dailyGoalMl`/`quickLogAmountsMl` round-trip — those are the
@@ -67,7 +67,7 @@ class HydrationConfig {
 
   factory HydrationConfig.fromMap(Map<String, dynamic> map) => HydrationConfig(
     dailyGoalMl: map['dailyGoalMl'] as int? ?? 2250,
-    quickLogAmountsMl: (map['quickLogAmountsMl'] as List?)?.cast<int>() ?? const [150, 250, 300, 500],
+    quickLogAmountsMl: (map['quickLogAmountsMl'] as List?)?.cast<int>() ?? const [100, 150, 250, 300],
   );
 }
 

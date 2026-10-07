@@ -45,6 +45,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/progress', builder: (context, state) => const ProgressScreen()),
     GoRoute(path: '/progress/weight', builder: (context, state) => const WeightTrendDetailScreen()),
     GoRoute(path: '/progress/knee', builder: (context, state) => const KneeTrendDetailScreen()),
+    GoRoute(
+      path: '/progress/day/:date',
+      builder: (context, state) =>
+          DayActivityScreen(day: DateTime.parse(state.pathParameters['date']!)),
+    ),
     GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
   ],
 );

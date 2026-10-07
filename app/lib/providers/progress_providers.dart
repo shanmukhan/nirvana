@@ -111,16 +111,17 @@ class TodayActivityEntry {
   });
 }
 
-bool _isToday(DateTime d) {
-  final now = DateTime.now();
-  return d.year == now.year && d.month == now.month && d.day == now.day;
-}
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
 
-/// Everything logged today (water, meals, exercise, dhyana, weight, knee),
-/// newest first — see health-plan-source.md §18. Distinct from
+/// Everything logged on [day] (water, meals, exercise, dhyana, weight,
+/// knee), newest first — see health-plan-source.md §18. Distinct from
 /// [adherenceProvider] (yes/no per habit per day): this is the actual
-/// chronological log of what happened today, with times.
-final todaysActivityProvider = FutureProvider.autoDispose<List<TodayActivityEntry>>((ref) async {
+/// chronological log of what happened that day, with times. Used both for
+/// "Today's progress" (day: today) and the per-date drilldown reached by
+/// tapping a day in the adherence grid.
+final dayActivityProvider = FutureProvider.autoDispose
+    .family<List<TodayActivityEntry>, DateTime>((ref, day) async {
   ref.watch(waterRefreshProvider);
   ref.watch(foodRefreshProvider);
   ref.watch(exerciseRefreshProvider);
@@ -129,17 +130,16 @@ final todaysActivityProvider = FutureProvider.autoDispose<List<TodayActivityEntr
   ref.watch(kneeRefreshProvider);
   ref.watch(deskBreakLogRefreshProvider);
 
-  final today = DateTime.now();
-  final water = await ref.watch(waterRepositoryProvider).forDay(today);
-  final meals = await ref.watch(mealRepositoryProvider).forDay(today);
-  final exerciseSessions = await ref.watch(exerciseRepositoryProvider).forDay(today);
+  final water = await ref.watch(waterRepositoryProvider).forDay(day);
+  final meals = await ref.watch(mealRepositoryProvider).forDay(day);
+  final exerciseSessions = await ref.watch(exerciseRepositoryProvider).forDay(day);
   final exerciseDefinitions = await ref.watch(exerciseDefinitionsProvider.future);
-  final dhyanaSessions = await ref.watch(dhyanaRepositoryProvider).forDay(today);
+  final dhyanaSessions = await ref.watch(dhyanaRepositoryProvider).forDay(day);
   final weightEntries = (await ref.watch(weightRepositoryProvider).recent(limit: 10))
-      .where((e) => _isToday(e.takenAt));
+      .where((e) => _isSameDay(e.takenAt, day));
   final painEntries = (await ref.watch(painRepositoryProvider).recent(limit: 10))
-      .where((e) => _isToday(e.recordedAt));
-  final deskBreaks = (await ref.watch(deskBreakLogRepositoryProvider).forDay(today))
+      .where((e) => _isSameDay(e.recordedAt, day));
+  final deskBreaks = (await ref.watch(deskBreakLogRepositoryProvider).forDay(day))
       .where((e) => e.status == DeskBreakLogStatus.done);
 
   final exerciseNames = {for (final d in exerciseDefinitions) d.id: d.name};

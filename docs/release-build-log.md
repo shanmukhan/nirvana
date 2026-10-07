@@ -241,3 +241,49 @@ bundle.
 
 **Verification:** `flutter analyze` and `flutter test` clean before
 building.
+
+## v1.0.9+9 (2026-09-07)
+
+**Command:** `flutter build appbundle --release` from `app/`.
+
+**Output:** `app/build/app/outputs/bundle/release/app-release.aab`
+(60.7MB), signed via `android/key.properties` →
+`/Users/shanmukhan/secrets/nirvana/upload-keystore.jks`. Confirmed via
+the merged release manifest
+(`build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml`):
+`package="com.nirvana.nirvana"`, `versionCode="9"`, `versionName="1.0.9"`.
+
+**Version bump:** was `1.0.8+8`; bumped to `1.0.9+9` (minor bump,
+`versionCode` +1) — this build adds user-facing features, same rule as
+the `1.0.5+5`/`1.0.8+8` bumps above.
+
+**What's in this build:**
+
+- **Dhyana session log with date picker**: the Dhyana screen now lists
+  every session logged on a selected date (practice, time, duration),
+  defaulting to today, via a new calendar-icon date picker
+  (`dhyanaSelectedDateProvider` / `dhyanaSessionsForSelectedDateProvider`
+  in `dhyana_providers.dart`). Replaces the old bare "Sessions completed
+  today: N" count.
+- **Mood before/after + notes**: `DhyanaSession.moodBefore1to5` /
+  `moodAfter1to5` / `notes` existed in the data model since v1 but were
+  never wired to any UI. Mood-before is now an optional 1–5 picker in the
+  session setup panel; mood-after and a short note are captured in an
+  optional, skippable dialog (`_CloseCheckInDialog`) when a session ends.
+  Both show up in the session log list when present.
+- **Weekend session length applied**: `DhyanaConfig.weekendSession` (17
+  min default) existed in `routine_config.dart` but nothing read it — the
+  screen now defaults the planned duration to the weekend length on
+  Saturday/Sunday instead of always using the weekday length.
+- **7-day total**: a "Last 7 days: N min sat" line next to the streak
+  (`dhyanaWeekMinutesProvider`), since the streak count alone hides a
+  week that was shorter-but-consistent vs. one long session then
+  nothing.
+
+See `docs/dhyana-plan.md` "Implemented since v1" for the full writeup,
+and its "Candidate features" section for what's next (secondary
+mid-morning session settings/scheduling, a real bell sound in-session,
+editable/backdated session log entries, practice/mood trend charts).
+
+**Verification:** `flutter analyze` and `flutter test` clean before
+building.
