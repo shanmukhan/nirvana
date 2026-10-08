@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories/desk_break_log_repository.dart' show DeskBreakLogStatus;
+import '../domain/calendar_days.dart';
 import '../domain/entities.dart';
 import '../domain/meal_templates.dart' show MealTypeLabel;
 import '../screens/exercise/exercise_screen.dart'
@@ -17,15 +18,13 @@ import 'water_providers.dart';
 /// screen's trend chart. See health-plan-source.md §16/§17.
 final weightTrendProvider = FutureProvider.autoDispose<List<WeightEntry>>((ref) async {
   ref.watch(weightRefreshProvider);
-  final entries = await ref.watch(weightRepositoryProvider).recent(limit: 90);
-  return entries.reversed.toList();
+  return ref.watch(weightRepositoryProvider).lastDays(90);
 });
 
 /// "Pain before" ratings over the last 90 days, oldest first.
 final painTrendProvider = FutureProvider.autoDispose<List<PainEntry>>((ref) async {
   ref.watch(kneeRefreshProvider);
-  final entries = await ref.watch(painRepositoryProvider).recent(limit: 90);
-  return entries.reversed.toList();
+  return ref.watch(painRepositoryProvider).lastDays(90);
 });
 
 const int adherenceDays = 7;
@@ -57,40 +56,35 @@ class DayAdherence {
 final adherenceProvider = FutureProvider.autoDispose<List<DayAdherence>>((ref) async {
   ref.watch(waterRefreshProvider);
   ref.watch(dhyanaRefreshProvider);
-
+  ref.watch(exerciseRefreshProvider);
+  ref.watch(foodRefreshProvider);
   final waterRepo = ref.watch(waterRepositoryProvider);
   final dhyanaRepo = ref.watch(dhyanaRepositoryProvider);
   final exerciseRepo = ref.watch(exerciseRepositoryProvider);
   final mealRepo = ref.watch(mealRepositoryProvider);
-
-  final waterTotals = await waterRepo.dailyTotalsForLastDays(adherenceDays);
-  final goal = (await ref.watch(hydrationConfigProvider.future)).dailyGoalMl;
-
-  final today = DateTime.now();
-  final todayStart = DateTime(today.year, today.month, today.day);
-  final days = [
-    for (var i = adherenceDays - 1; i >= 0; i--) todayStart.subtract(Duration(days: i)),
-  ];
-
-  final result = <DayAdherence>[];
-  for (var i = 0; i < days.length; i++) {
-    final day = days[i];
-    final dhyanaDone = (await dhyanaRepo.forDay(day)).isNotEmpty;
-    final exerciseDone = (await exerciseRepo.forDay(day)).isNotEmpty;
-    final mealsDone = (await mealRepo.forDay(day)).isNotEmpty;
-    result.add(
+  final goalFuture = ref.watch(hydrationConfigProvider.future);
+  final now = DateTime.now();
+  final waterFuture = waterRepo.dailyTotalsForLastDays(adherenceDays, now: now);
+  final completionsFuture = Future.wait([
+    dhyanaRepo.loggedDays(adherenceDays, now: now),
+    exerciseRepo.loggedDays(adherenceDays, now: now),
+    mealRepo.loggedDays(adherenceDays, now: now),
+  ]);
+  final waterTotals = await waterFuture;
+  final completions = await completionsFuture;
+  final goal = (await goalFuture).dailyGoalMl;
+  return [
+    for (final total in waterTotals)
       DayAdherence(
-        day: day,
+        day: total.key,
         done: {
-          AdherenceHabit.water: waterTotals[i].value >= goal,
-          AdherenceHabit.dhyana: dhyanaDone,
-          AdherenceHabit.exercise: exerciseDone,
-          AdherenceHabit.meals: mealsDone,
+          AdherenceHabit.water: total.value >= goal,
+          AdherenceHabit.dhyana: completions[0].contains(calendarDateKey(total.key)),
+          AdherenceHabit.exercise: completions[1].contains(calendarDateKey(total.key)),
+          AdherenceHabit.meals: completions[2].contains(calendarDateKey(total.key)),
         },
       ),
-    );
-  }
-  return result;
+  ];
 });
 
 enum TodayActivityKind { water, meal, exercise, dhyana, weight, knee, deskBreak }
@@ -111,17 +105,16 @@ class TodayActivityEntry {
   });
 }
 
-bool _isSameDay(DateTime a, DateTime b) =>
-    a.year == b.year && a.month == b.month && a.day == b.day;
-
 /// Everything logged on [day] (water, meals, exercise, dhyana, weight,
 /// knee), newest first — see health-plan-source.md §18. Distinct from
 /// [adherenceProvider] (yes/no per habit per day): this is the actual
 /// chronological log of what happened that day, with times. Used both for
 /// "Today's progress" (day: today) and the per-date drilldown reached by
 /// tapping a day in the adherence grid.
-final dayActivityProvider = FutureProvider.autoDispose
-    .family<List<TodayActivityEntry>, DateTime>((ref, day) async {
+final dayActivityProvider = FutureProvider.autoDispose.family<List<TodayActivityEntry>, DateTime>((
+  ref,
+  day,
+) async {
   ref.watch(waterRefreshProvider);
   ref.watch(foodRefreshProvider);
   ref.watch(exerciseRefreshProvider);
@@ -135,12 +128,11 @@ final dayActivityProvider = FutureProvider.autoDispose
   final exerciseSessions = await ref.watch(exerciseRepositoryProvider).forDay(day);
   final exerciseDefinitions = await ref.watch(exerciseDefinitionsProvider.future);
   final dhyanaSessions = await ref.watch(dhyanaRepositoryProvider).forDay(day);
-  final weightEntries = (await ref.watch(weightRepositoryProvider).recent(limit: 10))
-      .where((e) => _isSameDay(e.takenAt, day));
-  final painEntries = (await ref.watch(painRepositoryProvider).recent(limit: 10))
-      .where((e) => _isSameDay(e.recordedAt, day));
-  final deskBreaks = (await ref.watch(deskBreakLogRepositoryProvider).forDay(day))
-      .where((e) => e.status == DeskBreakLogStatus.done);
+  final weightEntries = await ref.watch(weightRepositoryProvider).forDay(day);
+  final painEntries = await ref.watch(painRepositoryProvider).forDay(day);
+  final deskBreaks = (await ref.watch(deskBreakLogRepositoryProvider).forDay(day)).where(
+    (e) => e.status == DeskBreakLogStatus.done,
+  );
 
   final exerciseNames = {for (final d in exerciseDefinitions) d.id: d.name};
 
@@ -164,7 +156,8 @@ final dayActivityProvider = FutureProvider.autoDispose
         time: s.performedAt,
         kind: TodayActivityKind.exercise,
         title: exerciseNames[s.exerciseDefinitionId] ?? 'Exercise',
-        subtitle: '${s.completedSets} × ${s.completedReps}'
+        subtitle:
+            '${s.completedSets} × ${s.completedReps}'
             '${s.painRating0to10 != null ? '  ·  pain ${s.painRating0to10}/10' : ''}',
       ),
     for (final d in dhyanaSessions)

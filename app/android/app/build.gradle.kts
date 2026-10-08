@@ -8,9 +8,33 @@ plugins {
 }
 
 val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
+val keystorePropertiesFile = rootProject.file(
+    providers.gradleProperty("nirvanaSigningPropertiesFile").orElse("key.properties").get()
+)
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+}
+
+val validateReleaseSigning by tasks.registering {
+    doLast {
+        check(keystorePropertiesFile.exists()) {
+            "Release signing is required. Create android/key.properties from key.properties.example."
+        }
+        for (property in listOf("keyAlias", "keyPassword", "storeFile", "storePassword")) {
+            check(!keystoreProperties.getProperty(property).isNullOrBlank()) {
+                "Release signing property '$property' is missing."
+            }
+        }
+        check(file(keystoreProperties.getProperty("storeFile")).isFile) {
+            "The configured release keystore file does not exist."
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name.contains("Release") && name != "validateReleaseSigning") {
+        dependsOn(validateReleaseSigning)
+    }
 }
 
 android {
@@ -42,23 +66,17 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                // Falls back to the debug key so `flutter run --release` still
-                // works for anyone without android/key.properties locally.
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

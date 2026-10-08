@@ -8,9 +8,7 @@ import '../screen_scaffold.dart';
 
 final weightRefreshProvider = StateProvider<int>((ref) => 0);
 
-final recentWeightEntriesProvider = FutureProvider.autoDispose<List<WeightEntry>>((
-  ref,
-) async {
+final recentWeightEntriesProvider = FutureProvider.autoDispose<List<WeightEntry>>((ref) async {
   ref.watch(weightRefreshProvider);
   return ref.watch(weightRepositoryProvider).recent(limit: 14);
 });
@@ -92,44 +90,68 @@ class WeightScreen extends ConsumerWidget {
   }
 
   Future<void> _showAddWeightSheet(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
     final result = await showModalBottomSheet<double>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Log weight', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Weight (kg)'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () {
-                final value = double.tryParse(controller.text);
-                if (value != null) Navigator.of(context).pop(value);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) => const _WeightEntrySheet(),
     );
-    if (result != null) {
+    if (result != null && context.mounted) {
       await ref.read(weightRepositoryProvider).add(weightKg: result);
-      ref.read(weightRefreshProvider.notifier).state++;
+      if (context.mounted) ref.read(weightRefreshProvider.notifier).state++;
     }
   }
+}
+
+class _WeightEntrySheet extends StatefulWidget {
+  const _WeightEntrySheet();
+  @override
+  State<_WeightEntrySheet> createState() => _WeightEntrySheetState();
+}
+
+class _WeightEntrySheetState extends State<_WeightEntrySheet> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+    child: Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Log weight', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Weight (kg)'),
+            validator: (text) {
+              final value = double.tryParse(text?.trim() ?? '');
+              return value == null || !value.isFinite || value <= 0
+                  ? 'Enter a weight greater than zero.'
+                  : null;
+            },
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                Navigator.of(context).pop(double.parse(_controller.text.trim()));
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

@@ -53,6 +53,7 @@ class PhoneUsageService {
   /// The core check, shared by the background task and any in-app
   /// manual trigger. Returns true if a warning was shown.
   static Future<bool> checkAndMaybeWarn() async {
+    await PhoneUsagePrefs.reload();
     if (!await PhoneUsagePrefs.isEnabled()) return false;
     if (!await hasPermission()) return false;
 
@@ -87,7 +88,8 @@ class PhoneUsageService {
     final events = await UsageStats.queryEvents(start, now);
 
     DateTime? lastOnStart;
-    for (final event in events..sort((a, b) => (a.timeStamp ?? '0').compareTo(b.timeStamp ?? '0'))) {
+    for (final event
+        in events..sort((a, b) => (a.timeStamp ?? '0').compareTo(b.timeStamp ?? '0'))) {
       switch (event.eventTypeValue) {
         case 15: // SCREEN_INTERACTIVE
           lastOnStart = event.timeStampDate;
@@ -105,12 +107,12 @@ class PhoneUsageService {
 /// notification. Must be a top-level/static function — the plugin may
 /// invoke it in a background isolate when the app isn't running.
 @pragma('vm:entry-point')
-void phoneUsageNotificationResponseHandler(NotificationResponse response) {
+Future<void> phoneUsageNotificationResponseHandler(NotificationResponse response) async {
   if (response.actionId != NotificationService.snoozePhoneUsageActionId) return;
   WidgetsFlutterBinding.ensureInitialized();
-  PhoneUsagePrefs.snoozeMinutes().then((minutes) {
-    PhoneUsagePrefs.snoozeFor(Duration(minutes: minutes));
-  });
+  await PhoneUsagePrefs.reload();
+  final minutes = await PhoneUsagePrefs.snoozeMinutes();
+  await PhoneUsagePrefs.snoozeFor(Duration(minutes: minutes));
 }
 
 /// WorkManager's background isolate entry point. Re-initializes just

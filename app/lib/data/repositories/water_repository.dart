@@ -1,6 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
 import '../../domain/entities.dart';
+import '../../domain/log_validation.dart';
 import 'id_generator.dart';
 
 class WaterRepository {
@@ -9,11 +11,8 @@ class WaterRepository {
   WaterRepository(this._db);
 
   Future<WaterEntry> log(int amountMl, {DateTime? loggedAt}) async {
-    final entry = WaterEntry(
-      id: newId(),
-      loggedAt: loggedAt ?? DateTime.now(),
-      amountMl: amountMl,
-    );
+    requirePositiveNumber(amountMl, 'amountMl');
+    final entry = WaterEntry(id: newId(), loggedAt: loggedAt ?? DateTime.now(), amountMl: amountMl);
     await _db.insert('water_entry', {
       'id': entry.id,
       'logged_at': entry.loggedAt.toIso8601String(),
@@ -24,7 +23,7 @@ class WaterRepository {
 
   Future<List<WaterEntry>> forDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
-    final end = start.add(const Duration(days: 1));
+    final end = calendarDayOffset(start, 1);
     final rows = await _db.query(
       'water_entry',
       where: 'logged_at >= ? AND logged_at < ?',
@@ -43,33 +42,32 @@ class WaterRepository {
   }
 
   Future<int> totalMlForDay(DateTime day) async {
-    final entries = await forDay(day);
-    return entries.fold<int>(0, (sum, e) => sum + e.amountMl);
+    final rows = await _db.rawQuery(
+      'SELECT COALESCE(SUM(amount_ml), 0) AS total FROM water_entry WHERE logged_at >= ? AND logged_at < ?',
+      [startOfDay(day).toIso8601String(), calendarDayOffset(day, 1).toIso8601String()],
+    );
+    return rows.first['total'] as int;
   }
 
   /// Total ml per day for the [days] days ending today (oldest first) —
   /// used for the weekly hydration consistency chart/streak on the Water
   /// screen. A single ranged query rather than N calls to [forDay].
-  Future<List<MapEntry<DateTime, int>>> dailyTotalsForLastDays(int days) async {
-    final today = DateTime.now();
-    final todayStart = DateTime(today.year, today.month, today.day);
-    final rangeStart = todayStart.subtract(Duration(days: days - 1));
-    final rangeEnd = todayStart.add(const Duration(days: 1));
-
-    final rows = await _db.query(
-      'water_entry',
-      where: 'logged_at >= ? AND logged_at < ?',
-      whereArgs: [rangeStart.toIso8601String(), rangeEnd.toIso8601String()],
+  Future<List<MapEntry<DateTime, int>>> dailyTotalsForLastDays(int days, {DateTime? now}) async {
+    RangeError.checkValueInInterval(days, 1, 3660, 'days');
+    final today = startOfDay(now ?? DateTime.now());
+    final start = calendarDayOffset(today, 1 - days);
+    final rows = await _db.rawQuery(
+      'SELECT substr(logged_at, 1, 10) AS day, SUM(amount_ml) AS total FROM water_entry '
+      'WHERE logged_at >= ? AND logged_at < ? GROUP BY substr(logged_at, 1, 10)',
+      [start.toIso8601String(), calendarDayOffset(today, 1).toIso8601String()],
     );
-
-    final totals = <DateTime, int>{
-      for (var i = 0; i < days; i++) rangeStart.add(Duration(days: i)): 0,
-    };
-    for (final row in rows) {
-      final loggedAt = DateTime.parse(row['logged_at'] as String);
-      final day = DateTime(loggedAt.year, loggedAt.month, loggedAt.day);
-      totals[day] = (totals[day] ?? 0) + (row['amount_ml'] as int);
-    }
-    return totals.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final totals = {for (final row in rows) row['day'] as String: row['total'] as int};
+    return [
+      for (var i = 0; i < days; i++)
+        MapEntry(
+          calendarDayOffset(start, i),
+          totals[calendarDateKey(calendarDayOffset(start, i))] ?? 0,
+        ),
+    ];
   }
 }

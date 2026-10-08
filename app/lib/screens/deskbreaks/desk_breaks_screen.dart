@@ -5,6 +5,7 @@ import '../../data/repositories/desk_break_log_repository.dart';
 import '../../providers/desk_break_providers.dart';
 import '../../services/reminder_prefs.dart';
 import '../../services/reminder_scheduler.dart';
+import '../reminder_coverage.dart';
 import '../screen_scaffold.dart';
 
 /// Eye, movement, knee-mobility, and neck-exercise break reminders on
@@ -20,11 +21,7 @@ class DeskBreaksScreen extends StatelessWidget {
       title: 'Desk Breaks',
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          _AdherenceCard(),
-          SizedBox(height: 16),
-          _DeskBreaksReminderCard(),
-        ],
+        children: const [_AdherenceCard(), SizedBox(height: 16), _DeskBreaksReminderCard()],
       ),
     );
   }
@@ -55,7 +52,8 @@ class _AdherenceCard extends ConsumerWidget {
               error: (e, _) => Text('Could not load adherence: $e'),
               data: (summary) => Column(
                 children: [
-                  for (final type in DeskBreakType.values) _AdherenceRow(type: type, counts: summary[type]!),
+                  for (final type in DeskBreakType.values)
+                    _AdherenceRow(type: type, counts: summary[type]!),
                 ],
               ),
             ),
@@ -253,6 +251,11 @@ class _DeskBreaksReminderCardState extends State<_DeskBreaksReminderCard> {
                 await ReminderPrefs.setDeskBreakIntervalMinutes(type, v.round());
                 await ReminderScheduler.instance.rescheduleDeskBreak(type);
               },
+            ),
+            ReminderCoverage(
+              fromMinutes: _fromMinutes,
+              toMinutes: _toMinutes,
+              intervalMinutes: interval,
             ),
           ],
         ],

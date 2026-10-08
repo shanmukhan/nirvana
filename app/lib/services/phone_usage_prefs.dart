@@ -19,9 +19,22 @@ class PhoneUsagePrefs {
   static const defaultThresholdMinutes = 15;
   static const defaultSnoozeMinutes = 15;
 
+  /// Each isolate has its own cache; refresh before background decisions.
+  static Future<void> reload() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+  }
+
+  static Future<int> _getMinutes(String key, int fallback) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.get(key);
+    return value is int && value >= 5 && value <= 60 ? value : fallback;
+  }
+
   static Future<bool> isEnabled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_enabledKey) ?? true;
+    final value = prefs.get(_enabledKey);
+    return value is bool ? value : true;
   }
 
   static Future<void> setEnabled(bool enabled) async {
@@ -30,32 +43,37 @@ class PhoneUsagePrefs {
   }
 
   static Future<int> thresholdMinutes() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_thresholdMinutesKey) ?? defaultThresholdMinutes;
+    return _getMinutes(_thresholdMinutesKey, defaultThresholdMinutes);
   }
 
   static Future<void> setThresholdMinutes(int minutes) async {
+    RangeError.checkValueInInterval(minutes, 5, 60, 'minutes');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_thresholdMinutesKey, minutes);
   }
 
   static Future<int> snoozeMinutes() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_snoozeMinutesKey) ?? defaultSnoozeMinutes;
+    return _getMinutes(_snoozeMinutesKey, defaultSnoozeMinutes);
   }
 
   static Future<void> setSnoozeMinutes(int minutes) async {
+    RangeError.checkValueInInterval(minutes, 5, 60, 'minutes');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_snoozeMinutesKey, minutes);
   }
 
   static Future<DateTime?> snoozedUntil() async {
     final prefs = await SharedPreferences.getInstance();
-    final ms = prefs.getInt(_snoozedUntilKey);
-    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+    final ms = prefs.get(_snoozedUntilKey);
+    return ms is int && ms >= 0 && ms <= 8640000000000000
+        ? DateTime.fromMillisecondsSinceEpoch(ms)
+        : null;
   }
 
   static Future<void> snoozeFor(Duration duration) async {
+    if (duration.inMilliseconds <= 0) {
+      throw ArgumentError('Snooze must be greater than zero.');
+    }
     final prefs = await SharedPreferences.getInstance();
     final until = DateTime.now().add(duration);
     await prefs.setInt(_snoozedUntilKey, until.millisecondsSinceEpoch);

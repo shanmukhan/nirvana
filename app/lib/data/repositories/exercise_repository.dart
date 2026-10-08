@@ -1,6 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
 import '../../domain/entities.dart';
+import '../../domain/log_validation.dart';
+import 'date_queries.dart';
 import 'id_generator.dart';
 
 /// The 6 strength/knee-support exercises from health-plan-source.md §6.
@@ -48,8 +51,7 @@ const List<ExerciseDefinition> strengthExerciseSeed = [
   ExerciseDefinition(
     id: 'calf-raise',
     name: 'Calf Raise',
-    instructions:
-        'Hold a stable surface. Rise onto the balls of the feet. Lower slowly.',
+    instructions: 'Hold a stable surface. Rise onto the balls of the feet. Lower slowly.',
     defaultSets: 2,
     defaultReps: 15,
   ),
@@ -112,6 +114,9 @@ class ExerciseRepository {
     ExerciseFeedback feedback = ExerciseFeedback.fine,
     DateTime? performedAt,
   }) async {
+    requireNonNegativeNumber(completedSets, 'completedSets');
+    requireNonNegativeNumber(completedReps, 'completedReps');
+    requireRating(painRating0to10, 'painRating0to10');
     final session = ExerciseSession(
       id: newId(),
       performedAt: performedAt ?? DateTime.now(),
@@ -135,7 +140,7 @@ class ExerciseRepository {
 
   Future<List<ExerciseSession>> forDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
-    final end = start.add(const Duration(days: 1));
+    final end = calendarDayOffset(start, 1);
     final rows = await _db.query(
       'exercise_session',
       where: 'performed_at >= ? AND performed_at < ?',
@@ -155,4 +160,7 @@ class ExerciseRepository {
         )
         .toList();
   }
+
+  Future<Set<String>> loggedDays(int days, {DateTime? now}) =>
+      daysWithRecords(_db, 'exercise_session', 'performed_at', days, now: now);
 }

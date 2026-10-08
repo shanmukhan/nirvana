@@ -1,6 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
 import '../../domain/entities.dart';
+import '../../domain/log_validation.dart';
+import 'date_queries.dart';
 import 'id_generator.dart';
 
 class MealRepository {
@@ -14,11 +17,17 @@ class MealRepository {
     double? proteinEstimateG,
     DateTime? loggedAt,
   }) async {
+    if (description.trim().isEmpty) {
+      throw ArgumentError('Enter a meal description.');
+    }
+    if (proteinEstimateG != null) {
+      requireNonNegativeNumber(proteinEstimateG, 'proteinEstimateG');
+    }
     final entry = MealEntry(
       id: newId(),
       loggedAt: loggedAt ?? DateTime.now(),
       mealType: mealType,
-      description: description,
+      description: description.trim(),
       proteinEstimateG: proteinEstimateG,
     );
     await _db.insert('meal_entry', {
@@ -35,7 +44,7 @@ class MealRepository {
 
   Future<List<MealEntry>> forDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
-    final end = start.add(const Duration(days: 1));
+    final end = calendarDayOffset(start, 1);
     final rows = await _db.query(
       'meal_entry',
       where: 'logged_at >= ? AND logged_at < ?',
@@ -46,8 +55,11 @@ class MealRepository {
   }
 
   Future<double> totalProteinForDay(DateTime day) async {
-    final entries = await forDay(day);
-    return entries.fold<double>(0, (sum, e) => sum + (e.proteinEstimateG ?? 0));
+    final rows = await _db.rawQuery(
+      'SELECT COALESCE(SUM(protein_estimate_g), 0) AS total FROM meal_entry WHERE logged_at >= ? AND logged_at < ?',
+      [startOfDay(day).toIso8601String(), calendarDayOffset(day, 1).toIso8601String()],
+    );
+    return (rows.first['total'] as num).toDouble();
   }
 
   MealEntry _fromRow(Map<String, Object?> row) => MealEntry(
@@ -55,6 +67,9 @@ class MealRepository {
     loggedAt: DateTime.parse(row['logged_at'] as String),
     mealType: MealType.values.byName(row['meal_type'] as String),
     description: row['description'] as String,
-    proteinEstimateG: row['protein_estimate_g'] as double?,
+    proteinEstimateG: (row['protein_estimate_g'] as num?)?.toDouble(),
   );
+
+  Future<Set<String>> loggedDays(int days, {DateTime? now}) =>
+      daysWithRecords(_db, 'meal_entry', 'logged_at', days, now: now);
 }

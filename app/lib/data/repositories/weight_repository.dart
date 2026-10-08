@@ -1,6 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
 import '../../domain/entities.dart';
+import '../../domain/log_validation.dart';
+import 'date_queries.dart';
 import 'id_generator.dart';
 
 class WeightRepository {
@@ -14,6 +17,8 @@ class WeightRepository {
     String? notes,
     DateTime? takenAt,
   }) async {
+    requirePositiveNumber(weightKg, 'weightKg');
+    if (waistCm != null) requirePositiveNumber(waistCm, 'waistCm');
     final entry = WeightEntry(
       id: newId(),
       takenAt: takenAt ?? DateTime.now(),
@@ -26,25 +31,41 @@ class WeightRepository {
   }
 
   Future<List<WeightEntry>> recent({int limit = 90}) async {
-    final rows = await _db.query(
-      'weight_entry',
-      orderBy: 'taken_at DESC',
-      limit: limit,
-    );
+    final rows = await _db.query('weight_entry', orderBy: 'taken_at DESC', limit: limit);
     return rows.map(_fromRow).toList();
   }
 
   /// Average of the most recent entries within the last 7 days.
   Future<double?> sevenDayAverageKg() async {
-    final since = DateTime.now().subtract(const Duration(days: 7));
-    final rows = await _db.query(
-      'weight_entry',
-      where: 'taken_at >= ?',
-      whereArgs: [since.toIso8601String()],
+    final today = DateTime.now();
+    final rows = await _db.rawQuery(
+      'SELECT AVG(weight_kg) AS average FROM weight_entry WHERE taken_at >= ? AND taken_at < ?',
+      [
+        calendarDayOffset(today, -6).toIso8601String(),
+        calendarDayOffset(today, 1).toIso8601String(),
+      ],
     );
-    if (rows.isEmpty) return null;
-    final total = rows.fold<double>(0, (sum, row) => sum + (row['weight_kg'] as num));
-    return total / rows.length;
+    return (rows.first['average'] as num?)?.toDouble();
+  }
+
+  Future<List<WeightEntry>> forDay(DateTime day) async => (await queryDateRange(
+    _db,
+    'weight_entry',
+    'taken_at',
+    startOfDay(day),
+    calendarDayOffset(day, 1),
+  )).map(_fromRow).toList();
+
+  Future<List<WeightEntry>> lastDays(int days, {DateTime? now}) async {
+    RangeError.checkValueInInterval(days, 1, 3660, 'days');
+    final today = now ?? DateTime.now();
+    return (await queryDateRange(
+      _db,
+      'weight_entry',
+      'taken_at',
+      calendarDayOffset(today, 1 - days),
+      calendarDayOffset(today, 1),
+    )).map(_fromRow).toList();
   }
 
   Map<String, dynamic> _toRow(WeightEntry entry) => {

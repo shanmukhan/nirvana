@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_shell/router.dart';
 import 'data/db/app_database.dart';
+import 'domain/navigation_input.dart';
 import 'providers/repository_providers.dart';
 import 'services/notification_service.dart';
 import 'services/phone_usage_prefs.dart';
@@ -30,10 +31,7 @@ Future<void> main() async {
   await NotificationService.instance.requestPermission();
   await ReminderScheduler.instance.rescheduleAll();
   runApp(
-    ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
-      child: const NirvanaApp(),
-    ),
+    ProviderScope(overrides: [databaseProvider.overrideWithValue(db)], child: const NirvanaApp()),
   );
   // Cold start via a notification tap (app wasn't running): the plugin
   // still records the tap, but onDidReceiveNotificationResponse only
@@ -56,16 +54,8 @@ void _onNotificationResponse(NotificationResponse response) {
 }
 
 void _handleNotificationPayload(String? payload) {
-  if (payload == null) return;
-  if (payload == 'water') {
-    appRouter.go('/water-log');
-    return;
-  }
-  if (payload.startsWith('deskbreak:')) {
-    final parts = payload.split(':');
-    if (parts.length != 4) return;
-    appRouter.go('/desk-break-log/${parts[1]}/${parts[2]}/${parts[3]}');
-  }
+  final route = notificationRoute(payload);
+  if (route != null) appRouter.go(route);
 }
 
 class NirvanaApp extends ConsumerWidget {

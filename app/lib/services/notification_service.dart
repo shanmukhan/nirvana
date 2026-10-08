@@ -33,15 +33,14 @@ class NotificationService {
   );
   static const String _iosTone = 'nirvana_tone.wav';
 
-  static const AndroidNotificationDetails _highPriorityAndroidDetails =
-      AndroidNotificationDetails(
-        'nirvana_high_v2',
-        'High priority reminders',
-        channelDescription: 'Scheduled exercise reminders',
-        importance: Importance.high,
-        priority: Priority.high,
-        sound: _androidTone,
-      );
+  static const AndroidNotificationDetails _highPriorityAndroidDetails = AndroidNotificationDetails(
+    'nirvana_high_v2',
+    'High priority reminders',
+    channelDescription: 'Scheduled exercise reminders',
+    importance: Importance.high,
+    priority: Priority.high,
+    sound: _androidTone,
+  );
 
   static const AndroidNotificationDetails _mediumPriorityAndroidDetails =
       AndroidNotificationDetails(
@@ -58,19 +57,16 @@ class NotificationService {
   // `sound` field, so eye-distance/neck-exercise reminders never played a
   // sound. Channel importance/sound is immutable once created on a device,
   // hence the new channel id rather than editing nirvana_low_v2 in place.
-  static const AndroidNotificationDetails _lowPriorityAndroidDetails =
-      AndroidNotificationDetails(
-        'nirvana_low_v3',
-        'Low priority reminders',
-        channelDescription: 'Weigh-in reminders',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
-        sound: _androidTone,
-      );
-
-  static const DarwinNotificationDetails _iosDetails = DarwinNotificationDetails(
-    sound: _iosTone,
+  static const AndroidNotificationDetails _lowPriorityAndroidDetails = AndroidNotificationDetails(
+    'nirvana_low_v3',
+    'Low priority reminders',
+    channelDescription: 'Weigh-in reminders',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    sound: _androidTone,
   );
+
+  static const DarwinNotificationDetails _iosDetails = DarwinNotificationDetails(sound: _iosTone);
 
   // Water, Dhyana, Knee (check-in + mobility break), and Eye break each get
   // their own channel/sound so they're distinguishable by ear without
@@ -133,8 +129,7 @@ class NotificationService {
 
   Future<void> init({
     void Function(NotificationResponse response)? onNotificationResponse,
-    DidReceiveBackgroundNotificationResponseCallback?
-    onBackgroundNotificationResponse,
+    DidReceiveBackgroundNotificationResponseCallback? onBackgroundNotificationResponse,
   }) async {
     if (_initialized) return;
     tz_data.initializeTimeZones();
@@ -165,19 +160,14 @@ class NotificationService {
 
   Future<bool> requestPermission() async {
     final androidImpl = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (androidImpl != null) {
       return await androidImpl.requestNotificationsPermission() ?? false;
     }
     final iosImpl = _plugin
-        .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >();
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     if (iosImpl != null) {
-      return await iosImpl.requestPermissions(alert: true, badge: true, sound: true) ??
-          false;
+      return await iosImpl.requestPermissions(alert: true, badge: true, sound: true) ?? false;
     }
     return false;
   }
@@ -238,10 +228,7 @@ class NotificationService {
           priority: Priority.defaultPriority,
           sound: _androidTone,
           actions: <AndroidNotificationAction>[
-            AndroidNotificationAction(
-              snoozePhoneUsageActionId,
-              'Snooze $snoozeMinutes min',
-            ),
+            AndroidNotificationAction(snoozePhoneUsageActionId, 'Snooze $snoozeMinutes min'),
           ],
         ),
         iOS: _iosDetails,
@@ -261,10 +248,12 @@ class NotificationService {
     required NotificationChannel channel,
     String? payload,
   }) async {
+    RangeError.checkValueInInterval(hour, 0, 23, 'hour');
+    RangeError.checkValueInInterval(minute, 0, 59, 'minute');
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+      scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day + 1, hour, minute);
     }
     final exact = await canScheduleExactAlarms();
     await _plugin.zonedSchedule(
@@ -305,10 +294,7 @@ enum NotificationChannel {
   knee(NotificationService._kneeAndroidDetails, NotificationService._kneeIosDetails),
   eye(NotificationService._eyeAndroidDetails, NotificationService._eyeIosDetails),
   genericHigh(NotificationService._highPriorityAndroidDetails, NotificationService._iosDetails),
-  genericMedium(
-    NotificationService._mediumPriorityAndroidDetails,
-    NotificationService._iosDetails,
-  ),
+  genericMedium(NotificationService._mediumPriorityAndroidDetails, NotificationService._iosDetails),
   genericLow(NotificationService._lowPriorityAndroidDetails, NotificationService._iosDetails);
 
   final AndroidNotificationDetails _androidDetails;

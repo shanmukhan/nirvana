@@ -26,11 +26,7 @@ class HydrationSlot {
   final int minMl;
   final int maxMl;
 
-  const HydrationSlot({
-    required this.time,
-    required this.minMl,
-    required this.maxMl,
-  });
+  const HydrationSlot({required this.time, required this.minMl, required this.maxMl});
 }
 
 class HydrationConfig {
@@ -65,10 +61,29 @@ class HydrationConfig {
     'quickLogAmountsMl': quickLogAmountsMl,
   };
 
-  factory HydrationConfig.fromMap(Map<String, dynamic> map) => HydrationConfig(
-    dailyGoalMl: map['dailyGoalMl'] as int? ?? 2250,
-    quickLogAmountsMl: (map['quickLogAmountsMl'] as List?)?.cast<int>() ?? const [100, 150, 250, 300],
-  );
+  void validate() {
+    if (dailyGoalMl < 1000 ||
+        dailyGoalMl > 4000 ||
+        quickLogAmountsMl.isEmpty ||
+        quickLogAmountsMl.length > 16 ||
+        quickLogAmountsMl.any((amount) => amount <= 0)) {
+      throw const FormatException('Invalid hydration goal or quick-log amounts.');
+    }
+  }
+
+  factory HydrationConfig.fromMap(Map<String, dynamic> map) {
+    final goal = map['dailyGoalMl'] ?? 2250;
+    final amounts = map['quickLogAmountsMl'] ?? const [100, 150, 250, 300];
+    if (goal is! int || amounts is! List || amounts.any((amount) => amount is! int)) {
+      throw const FormatException('Invalid hydration configuration types.');
+    }
+    final config = HydrationConfig(
+      dailyGoalMl: goal,
+      quickLogAmountsMl: List<int>.unmodifiable(amounts),
+    );
+    config.validate();
+    return config;
+  }
 }
 
 /// Repeating interval-based desk break (eye, movement, knee mobility, neck).
@@ -92,16 +107,13 @@ class DeskBreaksConfig {
   final DeskBreakConfig eyeBreak;
   final DeskBreakConfig movementBreak;
   final DeskBreakConfig kneeMobilityBreak;
+
   /// Chin tucks, neck rotation, ear-to-shoulder, shoulder rolls, chest
   /// stretch. See health-plan-source.md §4D.
   final DeskBreakConfig neckExercise;
 
   const DeskBreaksConfig({
-    this.eyeBreak = const DeskBreakConfig(
-      enabled: true,
-      intervalMinutes: 25,
-      durationMinutes: 1,
-    ),
+    this.eyeBreak = const DeskBreakConfig(enabled: true, intervalMinutes: 25, durationMinutes: 1),
     this.movementBreak = const DeskBreakConfig(
       enabled: true,
       intervalMinutes: 50,

@@ -1,3 +1,4 @@
+import '../domain/reminder_plan.dart';
 import 'notification_service.dart';
 import 'reminder_prefs.dart';
 
@@ -134,17 +135,13 @@ class ReminderScheduler {
     required int intervalMinutes,
     required QuietHoursWindow quietHours,
   }) {
-    final slots = <(int, int)>[];
-    if (intervalMinutes <= 0 || toMinutes <= fromMinutes) return slots;
-    for (
-      var minutes = fromMinutes;
-      minutes <= toMinutes && slots.length < _maxSlotsPerCategory;
-      minutes += intervalMinutes
-    ) {
-      if (quietHours.contains(minutes)) continue;
-      slots.add((minutes ~/ 60, minutes % 60));
-    }
-    return slots;
+    return planReminderSlots(
+      fromMinutes: fromMinutes,
+      toMinutes: toMinutes,
+      intervalMinutes: intervalMinutes,
+      maxSlots: _maxSlotsPerCategory,
+      isQuiet: quietHours.contains,
+    ).slots;
   }
 
   Future<void> _scheduleWater(QuietHoursWindow quietHours) async {
@@ -180,6 +177,7 @@ class ReminderScheduler {
       hour: minutes ~/ 60,
       minute: minutes % 60,
       channel: NotificationChannel.dhyana,
+      payload: 'dhyana',
     );
   }
 
@@ -194,6 +192,7 @@ class ReminderScheduler {
       hour: minutes ~/ 60,
       minute: minutes % 60,
       channel: NotificationChannel.knee,
+      payload: 'knee',
     );
   }
 
@@ -208,6 +207,7 @@ class ReminderScheduler {
       hour: minutes ~/ 60,
       minute: minutes % 60,
       channel: NotificationChannel.genericLow,
+      payload: 'weight',
     );
   }
 
@@ -255,7 +255,11 @@ class QuietHoursWindow {
   final int startMinutes;
   final int endMinutes;
 
-  const QuietHoursWindow({required this.enabled, required this.startMinutes, required this.endMinutes});
+  const QuietHoursWindow({
+    required this.enabled,
+    required this.startMinutes,
+    required this.endMinutes,
+  });
 
   static Future<QuietHoursWindow> load() async {
     return QuietHoursWindow(

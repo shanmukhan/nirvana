@@ -20,44 +20,52 @@ final databaseProvider = Provider<Database>((ref) {
   throw UnimplementedError('databaseProvider must be overridden in main()');
 });
 
+/// Increment after a whole-database restore to refresh every dependent query.
+final databaseRevisionProvider = StateProvider<int>((ref) => 0);
+
+Database _currentDatabase(Ref ref) {
+  ref.watch(databaseRevisionProvider);
+  return ref.watch(databaseProvider);
+}
+
 final weightRepositoryProvider = Provider<WeightRepository>(
-  (ref) => WeightRepository(ref.watch(databaseProvider)),
+  (ref) => WeightRepository(_currentDatabase(ref)),
 );
 
 final waterRepositoryProvider = Provider<WaterRepository>(
-  (ref) => WaterRepository(ref.watch(databaseProvider)),
+  (ref) => WaterRepository(_currentDatabase(ref)),
 );
 
 final dhyanaRepositoryProvider = Provider<DhyanaRepository>(
-  (ref) => DhyanaRepository(ref.watch(databaseProvider)),
+  (ref) => DhyanaRepository(_currentDatabase(ref)),
 );
 
 final painRepositoryProvider = Provider<PainRepository>(
-  (ref) => PainRepository(ref.watch(databaseProvider)),
+  (ref) => PainRepository(_currentDatabase(ref)),
 );
 
 final exerciseRepositoryProvider = Provider<ExerciseRepository>(
-  (ref) => ExerciseRepository(ref.watch(databaseProvider)),
+  (ref) => ExerciseRepository(_currentDatabase(ref)),
 );
 
 final mealRepositoryProvider = Provider<MealRepository>(
-  (ref) => MealRepository(ref.watch(databaseProvider)),
+  (ref) => MealRepository(_currentDatabase(ref)),
 );
 
 final routineConfigRepositoryProvider = Provider<RoutineConfigRepository>(
-  (ref) => RoutineConfigRepository(ref.watch(databaseProvider)),
+  (ref) => RoutineConfigRepository(_currentDatabase(ref)),
 );
 
 final userProfileRepositoryProvider = Provider<UserProfileRepository>(
-  (ref) => UserProfileRepository(ref.watch(databaseProvider)),
+  (ref) => UserProfileRepository(_currentDatabase(ref)),
 );
 
 final deskBreakLogRepositoryProvider = Provider<DeskBreakLogRepository>(
-  (ref) => DeskBreakLogRepository(ref.watch(databaseProvider)),
+  (ref) => DeskBreakLogRepository(_currentDatabase(ref)),
 );
 
 final backupRepositoryProvider = Provider<BackupRepository>(
-  (ref) => BackupRepository(ref.watch(databaseProvider)),
+  (ref) => BackupRepository(_currentDatabase(ref)),
 );
 
 /// Bootstraps the default UserProfile/RoutineConfig and exercise library

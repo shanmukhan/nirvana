@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/entities.dart';
 import '../../domain/routine_config.dart' as config;
+import '../../domain/session_clock.dart';
 import '../../providers/dhyana_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../screen_scaffold.dart';
@@ -33,13 +34,14 @@ DhyanaPractice _toEntityPractice(config.DhyanaPracticeType t) => switch (t) {
 /// No streak-shaming copy anywhere in this screen — a missed day is just
 /// a missed day.
 class DhyanaScreen extends ConsumerStatefulWidget {
-  const DhyanaScreen({super.key});
+  final SessionClock? clock;
+  const DhyanaScreen({super.key, this.clock});
 
   @override
   ConsumerState<DhyanaScreen> createState() => _DhyanaScreenState();
 }
 
-class _DhyanaScreenState extends ConsumerState<DhyanaScreen> {
+class _DhyanaScreenState extends ConsumerState<DhyanaScreen> with WidgetsBindingObserver {
   static const config.DhyanaConfig _defaultConfig = config.DhyanaConfig();
 
   static bool get _isWeekend =>
@@ -55,55 +57,105 @@ class _DhyanaScreenState extends ConsumerState<DhyanaScreen> {
   int _plannedMinutes = _defaultPlannedMinutes;
   int? _moodBefore;
   Timer? _ticker;
-  Duration _elapsed = Duration.zero;
-  bool _running = false;
+  late final SessionClock _clock = widget.clock ?? SessionClock();
+  Duration get _elapsed => _clock.elapsed;
+  bool get _running => _clock.active;
+  bool _finishing = false;
+  bool _checkedIn = false;
+  _CloseCheckIn? _pendingCheckIn;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _clock.running) _tick();
+  }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   void _start() {
-    SystemSound.play(SystemSoundType.click); // gentle start bell stand-in
+    if (_finishing || _running) return;
+    SystemSound.play(SystemSoundType.click);
+    setState(() => _clock.start());
+    _startTicker();
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void _tick() {
+    if (!mounted || !_clock.running || _finishing) return;
+    if (_elapsed >= Duration(minutes: _plannedMinutes)) {
+      _finish();
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _togglePause() {
+    if (_finishing) return;
     setState(() {
-      _running = true;
-      _elapsed = Duration.zero;
-    });
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _elapsed += const Duration(seconds: 1));
-      if (_elapsed.inMinutes >= _plannedMinutes) {
-        _finish();
+      if (_clock.running) {
+        _clock.pause();
+        _ticker?.cancel();
+      } else {
+        _clock.resume();
+        _startTicker();
       }
     });
   }
 
   Future<void> _finish() async {
+    if (_finishing || !_running) return;
     _ticker?.cancel();
-    SystemSound.play(SystemSoundType.click); // gentle close bell stand-in
-    final actualMinutes = (_elapsed.inSeconds / 60).ceil().clamp(0, 1 << 30);
-    setState(() => _running = false);
-
-    // Optional, skippable check-in — mood/notes are never required to
-    // close out a session (docs/dhyana-plan.md: no forced friction).
-    final checkIn = mounted ? await _showCloseCheckIn(context) : null;
-
-    // No forced minimum duration — even a short session counts as completed.
-    await ref
-        .read(dhyanaRepositoryProvider)
-        .logSession(
-          plannedDurationMin: _plannedMinutes,
-          actualDurationMin: actualMinutes == 0 ? 1 : actualMinutes,
-          practiceType: _toEntityPractice(_practice),
-          moodBefore1to5: _moodBefore,
-          moodAfter1to5: checkIn?.moodAfter,
-          notes: checkIn?.notes,
-        );
-    ref.read(dhyanaRefreshProvider.notifier).state++;
     setState(() {
-      _elapsed = Duration.zero;
-      _moodBefore = null;
+      _finishing = true;
+      _clock.pause();
     });
+    SystemSound.play(SystemSoundType.click);
+    final actualMinutes = (_elapsed.inSeconds / 60).ceil().clamp(1, _plannedMinutes);
+    final repository = ref.read(dhyanaRepositoryProvider);
+    final refresh = ref.read(dhyanaRefreshProvider.notifier);
+    try {
+      if (!_checkedIn) {
+        _pendingCheckIn = await _showCloseCheckIn(context);
+        _checkedIn = true;
+      }
+      await repository.logSession(
+        plannedDurationMin: _plannedMinutes,
+        actualDurationMin: actualMinutes,
+        practiceType: _toEntityPractice(_practice),
+        moodBefore1to5: _moodBefore,
+        moodAfter1to5: _pendingCheckIn?.moodAfter,
+        notes: _pendingCheckIn?.notes,
+      );
+      refresh.state++;
+      _clock.reset();
+      _checkedIn = false;
+      _pendingCheckIn = null;
+      _moodBefore = null;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save the session. It is paused; tap End now to retry.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _finishing = false);
+    }
   }
 
   Future<_CloseCheckIn?> _showCloseCheckIn(BuildContext context) {
@@ -116,8 +168,9 @@ class _DhyanaScreenState extends ConsumerState<DhyanaScreen> {
   void _stopWithoutLogging() {
     _ticker?.cancel();
     setState(() {
-      _running = false;
-      _elapsed = Duration.zero;
+      _clock.reset();
+      _checkedIn = false;
+      _pendingCheckIn = null;
     });
   }
 
@@ -164,14 +217,11 @@ class _DhyanaScreenState extends ConsumerState<DhyanaScreen> {
             const SizedBox(height: 24),
             Text('How are you feeling? (optional)', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
-            _MoodPicker(
-              value: _moodBefore,
-              onChanged: (v) => setState(() => _moodBefore = v),
-            ),
+            _MoodPicker(value: _moodBefore, onChanged: (v) => setState(() => _moodBefore = v)),
             const SizedBox(height: 24),
             Center(
               child: FilledButton.icon(
-                onPressed: _start,
+                onPressed: _finishing ? null : _start,
                 icon: const Icon(Icons.self_improvement),
                 label: const Text('Start session'),
               ),
@@ -181,9 +231,16 @@ class _DhyanaScreenState extends ConsumerState<DhyanaScreen> {
               child: Wrap(
                 spacing: 12,
                 children: [
-                  FilledButton(onPressed: _finish, child: const Text('End now')),
                   OutlinedButton(
-                    onPressed: _stopWithoutLogging,
+                    onPressed: _finishing ? null : _togglePause,
+                    child: Text(_clock.running ? 'Pause' : 'Resume'),
+                  ),
+                  FilledButton(
+                    onPressed: _finishing ? null : _finish,
+                    child: Text(_finishing ? 'Saving…' : 'End now'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _finishing ? null : _stopWithoutLogging,
                     child: const Text('Cancel'),
                   ),
                 ],
@@ -206,10 +263,8 @@ class _DhyanaScreenState extends ConsumerState<DhyanaScreen> {
           weekMinutes.when(
             loading: () => const SizedBox.shrink(),
             error: (e, _) => const SizedBox.shrink(),
-            data: (minutes) => Text(
-              'Last 7 days: $minutes min sat',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            data: (minutes) =>
+                Text('Last 7 days: $minutes min sat', style: Theme.of(context).textTheme.bodySmall),
           ),
         ],
       ),
@@ -298,10 +353,7 @@ class _CloseCheckInDialogState extends State<_CloseCheckInDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'How do you feel now? (optional)',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text('How do you feel now? (optional)', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
           _MoodPicker(value: _moodAfter, onChanged: (v) => setState(() => _moodAfter = v)),
           const SizedBox(height: 16),
@@ -313,10 +365,7 @@ class _CloseCheckInDialogState extends State<_CloseCheckInDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Skip'),
-        ),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Skip')),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(
             _CloseCheckIn(

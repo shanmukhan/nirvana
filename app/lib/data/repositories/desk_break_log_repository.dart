@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
 import '../../services/reminder_prefs.dart';
 import 'id_generator.dart';
 
@@ -54,6 +55,8 @@ class DeskBreakLogRepository {
     required DeskBreakLogStatus status,
     DateTime? logDate,
   }) async {
+    RangeError.checkValueInInterval(slotHour, 0, 23, 'slotHour');
+    RangeError.checkValueInInterval(slotMinute, 0, 59, 'slotMinute');
     final day = logDate ?? DateTime.now();
     final firedAt = DateTime(day.year, day.month, day.day, slotHour, slotMinute);
     await _db.insert('desk_break_log', {
@@ -71,9 +74,7 @@ class DeskBreakLogRepository {
   /// Inserts an `autoMissed` row for every configured slot, for every
   /// enabled desk-break type, whose scheduled time today is more than
   /// [autoMissAfter] in the past and has no existing log row yet.
-  Future<void> sweepAutoMissed(
-    Map<DeskBreakType, List<(int hour, int minute)>> slotsByType,
-  ) async {
+  Future<void> sweepAutoMissed(Map<DeskBreakType, List<(int hour, int minute)>> slotsByType) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final batch = _db.batch();
@@ -128,12 +129,13 @@ class DeskBreakLogRepository {
   /// Per-type counts of done/skipped/autoMissed over the last [days] days
   /// (today inclusive), for the Desk Breaks adherence summary.
   Future<Map<DeskBreakType, Map<DeskBreakLogStatus, int>>> adherenceSummary(int days) async {
+    RangeError.checkValueInInterval(days, 1, 3660, 'days');
     final today = DateTime.now();
-    final start = DateTime(today.year, today.month, today.day).subtract(Duration(days: days - 1));
-    final rows = await _db.query(
-      'desk_break_log',
-      where: 'log_date >= ?',
-      whereArgs: [_dateKey(start)],
+    final start = calendarDayOffset(today, 1 - days);
+    final rows = await _db.rawQuery(
+      'SELECT desk_break_type, status, COUNT(*) AS count FROM desk_break_log '
+      'WHERE log_date >= ? AND log_date < ? GROUP BY desk_break_type, status',
+      [_dateKey(start), _dateKey(calendarDayOffset(today, 1))],
     );
     final summary = <DeskBreakType, Map<DeskBreakLogStatus, int>>{
       for (final type in DeskBreakType.values)
@@ -142,7 +144,7 @@ class DeskBreakLogRepository {
     for (final row in rows) {
       final type = DeskBreakType.values.byName(row['desk_break_type'] as String);
       final status = DeskBreakLogStatus.values.byName(row['status'] as String);
-      summary[type]![status] = (summary[type]![status] ?? 0) + 1;
+      summary[type]![status] = row['count'] as int;
     }
     return summary;
   }

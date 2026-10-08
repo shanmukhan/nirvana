@@ -63,7 +63,9 @@ class _TodayProgressCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final today = DateTime.now();
+    // Family keys must stay stable while a provider's loading/data states
+    // rebuild this card; a fresh timestamp causes an endless fetch loop.
+    final today = DateUtils.dateOnly(DateTime.now());
     final activityAsync = ref.watch(dayActivityProvider(today));
     return Card(
       child: Padding(
@@ -268,9 +270,7 @@ class _TrendSummaryCard<T> extends StatelessWidget {
                 children: [
                   Icon(icon, size: 18, color: color),
                   const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(title, style: Theme.of(context).textTheme.titleSmall),
-                  ),
+                  Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall)),
                   const Icon(Icons.chevron_right, size: 18),
                 ],
               ),
@@ -278,7 +278,13 @@ class _TrendSummaryCard<T> extends StatelessWidget {
               entriesAsync.when(
                 loading: () => const SizedBox(
                   height: 48,
-                  child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+                  child: Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
                 ),
                 error: (e, _) => _ErrorLine(e),
                 data: (entries) {
@@ -369,9 +375,8 @@ class _AdherenceGrid extends StatelessWidget {
             const SizedBox(),
             for (final day in days)
               InkWell(
-                onTap: () => context.push(
-                  '/progress/day/${DateFormat('yyyy-MM-dd').format(day.day)}',
-                ),
+                onTap: () =>
+                    context.push('/progress/day/${DateFormat('yyyy-MM-dd').format(day.day)}'),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Center(

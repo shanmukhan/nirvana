@@ -32,10 +32,7 @@ class FoodScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load food log: $e')),
         data: (entries) {
-          final totalProtein = entries.fold<double>(
-            0,
-            (sum, e) => sum + (e.proteinEstimateG ?? 0),
-          );
+          final totalProtein = entries.fold<double>(0, (sum, e) => sum + (e.proteinEstimateG ?? 0));
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -204,6 +201,7 @@ class _CustomMealSheet extends StatefulWidget {
 }
 
 class _CustomMealSheetState extends State<_CustomMealSheet> {
+  final _formKey = GlobalKey<FormState>();
   final _draft = _CustomMealDraft();
   final _descriptionController = TextEditingController();
   final _proteinController = TextEditingController();
@@ -224,33 +222,47 @@ class _CustomMealSheetState extends State<_CustomMealSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Log a meal', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _descriptionController,
-            decoration: const InputDecoration(labelText: 'What did you eat?'),
-            onChanged: (v) => _draft.description = v,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _proteinController,
-            decoration: const InputDecoration(
-              labelText: 'Protein estimate (g, optional)',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Log a meal', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _descriptionController,
+              validator: (text) =>
+                  text == null || text.trim().isEmpty ? 'Enter what you ate.' : null,
+              decoration: const InputDecoration(labelText: 'What did you eat?'),
+              onChanged: (v) => _draft.description = v,
+              textCapitalization: TextCapitalization.sentences,
             ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (v) => _draft.proteinEstimateG = double.tryParse(v),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(_draft),
-            child: const Text('Save'),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _proteinController,
+              validator: (text) {
+                if (text == null || text.trim().isEmpty) return null;
+                final value = double.tryParse(text.trim());
+                return value == null || !value.isFinite || value < 0
+                    ? 'Enter zero or more grams, or leave blank.'
+                    : null;
+              },
+              decoration: const InputDecoration(labelText: 'Protein estimate (g, optional)'),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (v) => _draft.proteinEstimateG = double.tryParse(v),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  Navigator.of(context).pop(_draft);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
       ),
     );
   }

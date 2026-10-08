@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Persisted per-category reminder settings, edited from Settings and read
@@ -11,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// [RoutineConfig]'s built-in defaults. See PROJECT_PLAN.md §6/§7.
 class ReminderPrefs {
   ReminderPrefs._();
+
+  static final quietHoursRevision = ValueNotifier<int>(0);
 
   // Water
   static const _waterEnabledKey = 'reminder_water_enabled';
@@ -55,22 +58,37 @@ class ReminderPrefs {
 
   static Future<bool> _getBool(String key, bool fallback) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(key) ?? fallback;
+    final value = prefs.get(key);
+    return value is bool ? value : fallback;
   }
 
   static Future<void> _setBool(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
+    if (key.startsWith('reminder_quiet_hours_')) quietHoursRevision.value++;
   }
 
   static Future<int> _getInt(String key, int fallback) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(key) ?? fallback;
+    final value = prefs.get(key);
+    final (min, max) = _range(key);
+    return value is int && value >= min && value <= max ? value : fallback;
+  }
+
+  static (int, int) _range(String key) {
+    if (key == _waterIntervalKey) return (30, 240);
+    if (key.startsWith('reminder_desk_') && key.endsWith('_interval_minutes')) {
+      return (15, 180);
+    }
+    return (0, 1439);
   }
 
   static Future<void> _setInt(String key, int value) async {
+    final (min, max) = _range(key);
+    RangeError.checkValueInInterval(value, min, max, key);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(key, value);
+    if (key.startsWith('reminder_quiet_hours_')) quietHoursRevision.value++;
   }
 
   // --- Water ---
