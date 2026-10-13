@@ -9,6 +9,7 @@ import '../../domain/entities.dart';
 import '../../domain/routine_config.dart' as config;
 import '../../domain/session_clock.dart';
 import '../../providers/dhyana_providers.dart';
+import '../../providers/calendar_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../screen_scaffold.dart';
 
@@ -140,7 +141,7 @@ class _DhyanaScreenState extends ConsumerState<DhyanaScreen> with WidgetsBinding
         moodAfter1to5: _pendingCheckIn?.moodAfter,
         notes: _pendingCheckIn?.notes,
       );
-      refresh.state++;
+      if (refresh.mounted) refresh.state++;
       _clock.reset();
       _checkedIn = false;
       _pendingCheckIn = null;
@@ -398,13 +399,16 @@ class _SessionsLogSection extends ConsumerWidget {
       lastDate: DateTime.now(),
     );
     if (picked != null) {
-      ref.read(dhyanaSelectedDateProvider.notifier).state = picked;
+      if (!context.mounted) return;
+      ref.read(dhyanaSelectedDateProvider.notifier).state = picked == ref.read(currentDayProvider)
+          ? null
+          : picked;
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedDate = ref.watch(dhyanaSelectedDateProvider);
+    final selectedDate = ref.watch(dhyanaEffectiveDateProvider);
     final sessionsAsync = ref.watch(dhyanaSessionsForSelectedDateProvider);
 
     return Column(

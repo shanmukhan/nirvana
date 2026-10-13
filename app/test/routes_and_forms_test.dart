@@ -35,6 +35,13 @@ void main() {
     await tester.tap(find.text('Open Dashboard'));
     await tester.pumpAndSettle();
     expect(find.text('Dashboard'), findsWidgets);
+    appRouter.go('/desk-break-log/eye/9/0?date=0001-01-01');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose date'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('weight form rejects invalid values then saves a valid weigh-in', (tester) async {

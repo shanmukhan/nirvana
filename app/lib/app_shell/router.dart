@@ -53,7 +53,16 @@ final GoRouter appRouter = GoRouter(
         );
         if (slot == null) return const DeskBreaksScreen();
         final (type, hour, minute) = slot;
-        return DeskBreakLogScreen(type: type, hour: hour, minute: minute);
+        final dateText = state.uri.queryParameters['date'];
+        final date = parseActivityDate(dateText);
+        if (dateText != null && date == null) return const DeskBreaksScreen();
+        return DeskBreakLogScreen(
+          key: ValueKey('${type.name}/$hour/$minute/$date'),
+          type: type,
+          hour: hour,
+          minute: minute,
+          logDate: date,
+        );
       },
     ),
     GoRoute(path: '/dhyana', builder: (context, state) => const DhyanaScreen()),

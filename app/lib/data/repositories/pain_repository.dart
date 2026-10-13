@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
 import '../../domain/log_validation.dart';
 import 'date_queries.dart';
@@ -77,7 +78,7 @@ class PainRepository {
 
   Map<String, dynamic> _toRow(PainEntry e) => {
     'id': e.id,
-    'recorded_at': e.recordedAt.toIso8601String(),
+    'recorded_at': localTimestamp(e.recordedAt),
     'pain_before_0_10': e.painBefore0to10,
     'pain_during_0_10': e.painDuring0to10,
     'pain_after_1_2h_0_10': e.painAfter1to2h0to10,

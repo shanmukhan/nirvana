@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
 import '../../domain/log_validation.dart';
 import 'date_queries.dart';
@@ -70,7 +71,7 @@ class WeightRepository {
 
   Map<String, dynamic> _toRow(WeightEntry entry) => {
     'id': entry.id,
-    'taken_at': entry.takenAt.toIso8601String(),
+    'taken_at': localTimestamp(entry.takenAt),
     'weight_kg': entry.weightKg,
     'waist_cm': entry.waistCm,
     'notes': entry.notes,

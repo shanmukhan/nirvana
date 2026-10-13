@@ -1,14 +1,11 @@
+import 'health_log_providers.dart';
+import 'calendar_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories/desk_break_log_repository.dart' show DeskBreakLogStatus;
 import '../domain/calendar_days.dart';
 import '../domain/entities.dart';
 import '../domain/meal_templates.dart' show MealTypeLabel;
-import '../screens/exercise/exercise_screen.dart'
-    show exerciseDefinitionsProvider, exerciseRefreshProvider;
-import '../screens/food/food_screen.dart' show foodRefreshProvider;
-import '../screens/knee/knee_screen.dart' show kneeRefreshProvider;
-import '../screens/weight/weight_screen.dart' show weightRefreshProvider;
 import 'desk_break_providers.dart' show deskBreakLogRefreshProvider;
 import 'dhyana_providers.dart';
 import 'repository_providers.dart';
@@ -18,12 +15,14 @@ import 'water_providers.dart';
 /// screen's trend chart. See health-plan-source.md §16/§17.
 final weightTrendProvider = FutureProvider.autoDispose<List<WeightEntry>>((ref) async {
   ref.watch(weightRefreshProvider);
+  ref.watch(currentDayProvider);
   return ref.watch(weightRepositoryProvider).lastDays(90);
 });
 
 /// "Pain before" ratings over the last 90 days, oldest first.
 final painTrendProvider = FutureProvider.autoDispose<List<PainEntry>>((ref) async {
   ref.watch(kneeRefreshProvider);
+  ref.watch(currentDayProvider);
   return ref.watch(painRepositoryProvider).lastDays(90);
 });
 
@@ -63,7 +62,7 @@ final adherenceProvider = FutureProvider.autoDispose<List<DayAdherence>>((ref) a
   final exerciseRepo = ref.watch(exerciseRepositoryProvider);
   final mealRepo = ref.watch(mealRepositoryProvider);
   final goalFuture = ref.watch(hydrationConfigProvider.future);
-  final now = DateTime.now();
+  final now = ref.watch(currentDayProvider);
   final waterFuture = waterRepo.dailyTotalsForLastDays(adherenceDays, now: now);
   final completionsFuture = Future.wait([
     dhyanaRepo.loggedDays(adherenceDays, now: now),
@@ -158,6 +157,7 @@ final dayActivityProvider = FutureProvider.autoDispose.family<List<TodayActivity
         title: exerciseNames[s.exerciseDefinitionId] ?? 'Exercise',
         subtitle:
             '${s.completedSets} × ${s.completedReps}'
+            '${s.partialReps > 0 ? ' + ${s.partialReps} partial reps' : ''}'
             '${s.painRating0to10 != null ? '  ·  pain ${s.painRating0to10}/10' : ''}',
       ),
     for (final d in dhyanaSessions)

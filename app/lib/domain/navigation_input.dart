@@ -1,4 +1,4 @@
-import '../services/reminder_prefs.dart';
+import 'desk_break_type.dart';
 
 /// Accept only known categories and real clock times from external payloads.
 (DeskBreakType, int, int)? parseDeskBreakSlot(
@@ -40,11 +40,14 @@ String? notificationRoute(String? payload) {
       return '/weight';
   }
   final parts = payload?.split(':');
-  if (parts == null || parts.length != 4 || parts.first != 'deskbreak') {
+  if (parts == null || (parts.length != 4 && parts.length != 5) || parts.first != 'deskbreak') {
     return null;
   }
   final slot = parseDeskBreakSlot(parts[1], parts[2], parts[3]);
   if (slot == null) return null;
   final (type, hour, minute) = slot;
-  return '/desk-break-log/${type.name}/$hour/$minute';
+  final date = parts.length == 5 ? parseActivityDate(parts[4]) : null;
+  if (parts.length == 5 && date == null) return null;
+  return '/desk-break-log/${type.name}/$hour/$minute'
+      '${date == null ? '' : '?date=${parts[4]}'}';
 }

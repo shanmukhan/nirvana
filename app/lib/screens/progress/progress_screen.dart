@@ -1,3 +1,4 @@
+import '../../providers/calendar_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -65,7 +66,7 @@ class _TodayProgressCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Family keys must stay stable while a provider's loading/data states
     // rebuild this card; a fresh timestamp causes an endless fetch loop.
-    final today = DateUtils.dateOnly(DateTime.now());
+    final today = ref.watch(currentDayProvider);
     final activityAsync = ref.watch(dayActivityProvider(today));
     return Card(
       child: Padding(
@@ -472,15 +473,20 @@ class _TrendDetailScreen<T> extends ConsumerWidget {
               else
                 SizedBox(
                   height: 220,
-                  child: CustomPaint(
-                    painter: _TrendChartPainter(
-                      points: [for (final e in entries) pointOf(e)],
-                      color: color(context),
-                      minY: yMin,
-                      maxY: yMax,
-                      filled: true,
+                  child: Semantics(
+                    label:
+                        '$title trend with ${entries.length} entries. Full measurements follow under History.',
+                    image: true,
+                    child: CustomPaint(
+                      painter: _TrendChartPainter(
+                        points: [for (final e in entries) pointOf(e)],
+                        color: color(context),
+                        minY: yMin,
+                        maxY: yMax,
+                        filled: true,
+                      ),
+                      size: Size.infinite,
                     ),
-                    size: Size.infinite,
                   ),
                 ),
               const SizedBox(height: 24),

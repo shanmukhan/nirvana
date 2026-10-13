@@ -1,4 +1,5 @@
 import 'package:nirvana/data/db/schema.dart';
+import 'package:nirvana/data/db/app_database.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Future<Database> openTestDatabase() async {
@@ -7,6 +8,7 @@ Future<Database> openTestDatabase() async {
     inMemoryDatabasePath,
     options: OpenDatabaseOptions(
       version: latestSchemaVersion,
+      onConfigure: AppDatabase.configure,
       onCreate: (db, _) async {
         for (final sql in [...createTableStatements, ...createIndexStatements]) {
           await db.execute(sql);

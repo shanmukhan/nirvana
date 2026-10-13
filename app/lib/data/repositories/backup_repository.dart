@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../domain/entities.dart';
 import '../../domain/routine_config.dart';
+import '../../domain/stored_dates.dart';
 import '../../services/reminder_prefs.dart';
 import '../db/schema.dart';
 import 'desk_break_log_repository.dart';
@@ -111,6 +112,9 @@ class BackupRepository {
             throw FormatException('Invalid type for $table.$name.');
           }
           _validateValue(table, name, value);
+          if (value is String && isStoredDateColumn(name)) {
+            row[name] = normalizeStoredDate(table, name, value);
+          }
         }
         if (!ids.add(row['id'] as String)) {
           throw FormatException('Duplicate id in $table.');
@@ -166,25 +170,8 @@ class BackupRepository {
     if (name == 'id' || name.endsWith('_id')) {
       require((value as String).trim().isNotEmpty);
     }
-    if (name.endsWith('_at') ||
-        name == 'date' ||
-        name == 'log_date' ||
-        name == 'scheduled_for' ||
-        name == 'snoozed_until' ||
-        name == 'bed_time' ||
-        name == 'wake_time') {
-      final text = value as String;
-      final parsed = DateTime.tryParse(text);
-      final shape = RegExp(
-        r'^\d{4}-\d{2}-\d{2}(?:T([0-2]\d):([0-5]\d):([0-5]\d)(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?)?$',
-      ).firstMatch(text);
-      require(
-        parsed != null &&
-            shape != null &&
-            (shape.group(1) == null || int.parse(shape.group(1)!) < 24) &&
-            text.length >= 10 &&
-            parsed.toIso8601String().substring(0, 10) == text.substring(0, 10),
-      );
+    if (isStoredDateColumn(name)) {
+      normalizeStoredDate(table, name, value as String);
     }
     if (name.endsWith('_0_10')) require((value as int) >= 0 && value <= 10);
     if (name.endsWith('_1_5')) require((value as int) >= 1 && value <= 5);
@@ -205,7 +192,7 @@ class BackupRepository {
     ].contains(name)) {
       require((value as int) > 0);
     }
-    if (name == 'completed_sets' || name == 'completed_reps') {
+    if (name == 'completed_sets' || name == 'completed_reps' || name == 'partial_reps') {
       require((value as int) >= 0);
     }
     if (name == 'slot_hour') require((value as int) >= 0 && value <= 23);

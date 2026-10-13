@@ -1,25 +1,14 @@
+export '../../providers/health_log_providers.dart'
+    show exerciseRefreshProvider, exerciseDefinitionsProvider, exerciseSessionsTodayProvider;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities.dart';
 import '../../providers/repository_providers.dart';
+import '../../providers/health_log_providers.dart';
 import '../screen_scaffold.dart';
+import '../save_button.dart';
 import 'guided_exercise_screen.dart';
-
-final exerciseRefreshProvider = StateProvider<int>((ref) => 0);
-
-final exerciseDefinitionsProvider = FutureProvider.autoDispose<List<ExerciseDefinition>>((
-  ref,
-) {
-  return ref.watch(exerciseRepositoryProvider).allDefinitions();
-});
-
-final exerciseSessionsTodayProvider = FutureProvider.autoDispose<List<ExerciseSession>>((
-  ref,
-) {
-  ref.watch(exerciseRefreshProvider);
-  return ref.watch(exerciseRepositoryProvider).forDay(DateTime.now());
-});
 
 /// Logging (manual, or guided with a per-rep/rest timer — see
 /// guided_exercise_screen.dart) for the 6 strength/knee-support exercises,
@@ -83,6 +72,7 @@ class ExerciseScreen extends ConsumerWidget {
       definition,
       initialSets: completed.completedSets,
       initialReps: completed.completedReps,
+      initialPartial: completed.partialReps,
     );
   }
 
@@ -92,28 +82,32 @@ class ExerciseScreen extends ConsumerWidget {
     ExerciseDefinition definition, {
     int? initialSets,
     int? initialReps,
+    int initialPartial = 0,
   }) async {
+    final repo = ref.read(exerciseRepositoryProvider);
+    final refresh = ref.read(exerciseRefreshProvider.notifier);
     final result = await showModalBottomSheet<_ExerciseLogDraft>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _ExerciseLogSheet(
         definition: definition,
+        onSave: (result) async {
+          await repo.logSession(
+            exerciseDefinitionId: definition.id,
+            completedSets: result.sets,
+            completedReps: result.reps,
+            partialReps: result.partialReps,
+            painRating0to10: result.painRating,
+            feedback: result.feedback,
+          );
+          if (refresh.mounted) refresh.state++;
+        },
         initialSets: initialSets,
         initialReps: initialReps,
+        initialPartial: initialPartial,
       ),
     );
     if (result == null) return;
-
-    await ref
-        .read(exerciseRepositoryProvider)
-        .logSession(
-          exerciseDefinitionId: definition.id,
-          completedSets: result.sets,
-          completedReps: result.reps,
-          painRating0to10: result.painRating,
-          feedback: result.feedback,
-        );
-    ref.read(exerciseRefreshProvider.notifier).state++;
 
     if (result.feedback == ExerciseFeedback.tooPainful && context.mounted) {
       await showDialog<void>(
@@ -150,7 +144,7 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loggedToday = sessionsToday.isNotEmpty;
+    final loggedToday = sessionsToday.any((s) => s.hasWork);
     return Card(
       child: InkWell(
         onTap: onLog,
@@ -201,18 +195,27 @@ class _ExerciseCard extends StatelessWidget {
 class _ExerciseLogDraft {
   int sets;
   int reps;
+  int partialReps;
   int painRating = 0;
   ExerciseFeedback feedback = ExerciseFeedback.fine;
 
-  _ExerciseLogDraft({required this.sets, required this.reps});
+  _ExerciseLogDraft({required this.sets, required this.reps, this.partialReps = 0});
 }
 
 class _ExerciseLogSheet extends StatefulWidget {
+  final Future<void> Function(_ExerciseLogDraft) onSave;
   final ExerciseDefinition definition;
   final int? initialSets;
   final int? initialReps;
+  final int initialPartial;
 
-  const _ExerciseLogSheet({required this.definition, this.initialSets, this.initialReps});
+  const _ExerciseLogSheet({
+    required this.onSave,
+    required this.definition,
+    this.initialSets,
+    this.initialReps,
+    this.initialPartial = 0,
+  });
 
   @override
   State<_ExerciseLogSheet> createState() => _ExerciseLogSheetState();
@@ -222,67 +225,79 @@ class _ExerciseLogSheetState extends State<_ExerciseLogSheet> {
   late final _draft = _ExerciseLogDraft(
     sets: widget.initialSets ?? widget.definition.defaultSets,
     reps: widget.initialReps ?? widget.definition.defaultReps,
+    partialReps: widget.initialPartial,
   );
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(widget.definition.name, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          _Stepper(
-            label: 'Sets',
-            value: _draft.sets,
-            onChanged: (v) => setState(() => _draft.sets = v),
-          ),
-          const SizedBox(height: 8),
-          _Stepper(
-            label: 'Reps',
-            value: _draft.reps,
-            onChanged: (v) => setState(() => _draft.reps = v),
-          ),
-          const SizedBox(height: 16),
-          Text('Pain during: ${_draft.painRating}/10'),
-          Slider(
-            value: _draft.painRating.toDouble(),
-            min: 0,
-            max: 10,
-            divisions: 10,
-            onChanged: (v) => setState(() => _draft.painRating = v.round()),
-          ),
-          const SizedBox(height: 8),
-          SegmentedButton<ExerciseFeedback>(
-            segments: const [
-              ButtonSegment(
-                value: ExerciseFeedback.fine,
-                label: Text('Felt fine'),
-                icon: Icon(Icons.sentiment_satisfied_outlined),
-              ),
-              ButtonSegment(
-                value: ExerciseFeedback.tooPainful,
-                label: Text('Too painful'),
-                icon: Icon(Icons.sentiment_dissatisfied_outlined),
-              ),
-            ],
-            selected: {_draft.feedback},
-            onSelectionChanged: (selection) =>
-                setState(() => _draft.feedback = selection.first),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(_draft),
-            child: const Text('Save'),
-          ),
-        ],
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(widget.definition.name, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            _Stepper(
+              label: 'Sets',
+              value: _draft.sets,
+              onChanged: (v) => setState(() => _draft.sets = v),
+            ),
+            const SizedBox(height: 8),
+            _Stepper(
+              label: 'Reps',
+              value: _draft.reps,
+              onChanged: (v) => setState(() => _draft.reps = v),
+            ),
+            const SizedBox(height: 16),
+            _Stepper(
+              label: 'Partial set reps',
+              value: _draft.partialReps,
+              onChanged: (v) => setState(() => _draft.partialReps = v),
+            ),
+            const SizedBox(height: 16),
+            Text('Pain during: ${_draft.painRating}/10'),
+            Slider(
+              value: _draft.painRating.toDouble(),
+              min: 0,
+              max: 10,
+              divisions: 10,
+              onChanged: (v) => setState(() => _draft.painRating = v.round()),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<ExerciseFeedback>(
+              segments: const [
+                ButtonSegment(
+                  value: ExerciseFeedback.fine,
+                  label: Text('Felt fine'),
+                  icon: Icon(Icons.sentiment_satisfied_outlined),
+                ),
+                ButtonSegment(
+                  value: ExerciseFeedback.tooPainful,
+                  label: Text('Too painful'),
+                  icon: Icon(Icons.sentiment_dissatisfied_outlined),
+                ),
+              ],
+              selected: {_draft.feedback},
+              onSelectionChanged: (selection) => setState(() => _draft.feedback = selection.first),
+            ),
+            const SizedBox(height: 16),
+            SaveButton(
+              enabled: _draft.sets * _draft.reps + _draft.partialReps > 0,
+              onSave: () async {
+                await widget.onSave(_draft);
+                return true;
+              },
+              onSaved: () => Navigator.of(context).pop(_draft),
+            ),
+          ],
+        ),
       ),
     );
   }

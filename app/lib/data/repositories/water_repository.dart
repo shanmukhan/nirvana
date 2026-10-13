@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
 import '../../domain/log_validation.dart';
 import 'id_generator.dart';
@@ -15,7 +16,7 @@ class WaterRepository {
     final entry = WaterEntry(id: newId(), loggedAt: loggedAt ?? DateTime.now(), amountMl: amountMl);
     await _db.insert('water_entry', {
       'id': entry.id,
-      'logged_at': entry.loggedAt.toIso8601String(),
+      'logged_at': localTimestamp(entry.loggedAt),
       'amount_ml': entry.amountMl,
     });
     return entry;
@@ -47,6 +48,25 @@ class WaterRepository {
       [startOfDay(day).toIso8601String(), calendarDayOffset(day, 1).toIso8601String()],
     );
     return rows.first['total'] as int;
+  }
+
+  /// Query backward in small windows until the first day below the current goal.
+  Future<int> currentStreakDays({required int goalMl, DateTime? now}) async {
+    requirePositiveNumber(goalMl, 'goalMl');
+    var cursor = startOfDay(now ?? DateTime.now());
+    var streak = 0;
+    var first = true;
+    while (true) {
+      final totals = (await dailyTotalsForLastDays(30, now: cursor)).reversed.toList();
+      for (var index = 0; index < totals.length; index++) {
+        final total = totals[index].value;
+        if (first && index == 0 && total < goalMl) continue;
+        if (total < goalMl) return streak;
+        streak++;
+      }
+      first = false;
+      cursor = calendarDayOffset(cursor, -30);
+    }
   }
 
   /// Total ml per day for the [days] days ending today (oldest first) —

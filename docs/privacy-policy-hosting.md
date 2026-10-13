@@ -44,7 +44,7 @@ The policy text was written from an actual code audit (not boilerplate):
 - The one permission worth explicitly calling out even though nothing is
   transmitted: `PACKAGE_USAGE_STATS`, used by
   `lib/services/phone_usage_service.dart` to read screen on/off event timing
-  (not per-app usage) for the continuous-phone-use nudge feature — processed
+  (only screen-interactive timing is used; app identifiers returned by the API are ignored and not retained) for the continuous-phone-use nudge feature — processed
   entirely on-device.
 - The data-export feature (`_BackupCard` in `settings_screen.dart`) shares a
   JSON file via the OS share sheet at the user's explicit action — the app

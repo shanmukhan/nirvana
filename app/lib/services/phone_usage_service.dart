@@ -5,6 +5,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'notification_service.dart';
 import 'phone_usage_prefs.dart';
+import 'reminder_scheduler.dart';
 
 /// Warns when the phone screen has been continuously on for longer than
 /// the configured threshold, with a snooze option — see
@@ -52,26 +53,39 @@ class PhoneUsageService {
 
   /// The core check, shared by the background task and any in-app
   /// manual trigger. Returns true if a warning was shown.
-  static Future<bool> checkAndMaybeWarn() async {
+  static Future<bool> checkAndMaybeWarn({
+    DateTime? at,
+    Future<bool> Function()? permissionCheck,
+    Future<DateTime?> Function(DateTime, int)? readScreenStart,
+    Future<void> Function(int, int)? showWarning,
+  }) async {
     await PhoneUsagePrefs.reload();
     if (!await PhoneUsagePrefs.isEnabled()) return false;
-    if (!await hasPermission()) return false;
+    final now = at ?? DateTime.now();
+    if ((await QuietHoursWindow.load()).contains(now.hour * 60 + now.minute)) return false;
+    if (!await (permissionCheck ?? hasPermission)()) return false;
 
     final snoozedUntil = await PhoneUsagePrefs.snoozedUntil();
-    final now = DateTime.now();
     if (snoozedUntil != null && now.isBefore(snoozedUntil)) return false;
 
     final thresholdMinutes = await PhoneUsagePrefs.thresholdMinutes();
-    final continuousMinutes = await _continuousScreenOnMinutes(now, thresholdMinutes);
-    if (continuousMinutes == null || continuousMinutes < thresholdMinutes) {
+    final start = await (readScreenStart ?? _continuousScreenStart)(now, thresholdMinutes);
+    if (start == null || start.isAfter(now)) return false;
+    final continuousMinutes = now.difference(start).inMinutes;
+    if (continuousMinutes < thresholdMinutes || await PhoneUsagePrefs.hasWarnedFor(start)) {
       return false;
     }
 
     final snoozeMinutes = await PhoneUsagePrefs.snoozeMinutes();
-    await NotificationService.instance.showPhoneUsageWarning(
-      continuousMinutes: continuousMinutes,
-      snoozeMinutes: snoozeMinutes,
-    );
+    if (showWarning != null) {
+      await showWarning(continuousMinutes, snoozeMinutes);
+    } else {
+      await NotificationService.instance.showPhoneUsageWarning(
+        continuousMinutes: continuousMinutes,
+        snoozeMinutes: snoozeMinutes,
+      );
+    }
+    await PhoneUsagePrefs.markWarned(start);
     return true;
   }
 
@@ -80,7 +94,7 @@ class PhoneUsageService {
   /// available (e.g. no screen on/off events at all in the query
   /// window — conservatively treated as "unknown", not "on", so this
   /// never fires on a guess).
-  static Future<int?> _continuousScreenOnMinutes(DateTime now, int thresholdMinutes) async {
+  static Future<DateTime?> _continuousScreenStart(DateTime now, int thresholdMinutes) async {
     // Query a window wider than the threshold so the actual on-transition
     // (not just the threshold boundary) is likely captured.
     final windowMinutes = (thresholdMinutes * 3).clamp(45, 180);
@@ -99,7 +113,7 @@ class PhoneUsageService {
     }
 
     if (lastOnStart == null) return null;
-    return now.difference(lastOnStart).inMinutes;
+    return lastOnStart;
   }
 }
 

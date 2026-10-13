@@ -1,3 +1,6 @@
+export '../domain/desk_break_type.dart';
+import '../domain/desk_break_type.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -144,16 +147,4 @@ class ReminderPrefs {
   static Future<int> quietHoursEndMinutes() =>
       _getInt(_quietHoursEndKey, defaultQuietHoursEndMinutes);
   static Future<void> setQuietHoursEndMinutes(int v) => _setInt(_quietHoursEndKey, v);
-}
-
-enum DeskBreakType {
-  eye('Eye break', 25),
-  movement('Movement break', 50),
-  kneeMobility('Knee mobility break', 120),
-  neck('Neck exercise', 75);
-
-  final String label;
-  final int defaultIntervalMinutes;
-
-  const DeskBreakType(this.label, this.defaultIntervalMinutes);
 }

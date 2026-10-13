@@ -54,6 +54,7 @@ class _ReminderCoverageState extends State<ReminderCoverage> {
         fromMinutes: widget.fromMinutes,
         toMinutes: widget.toMinutes,
         intervalMinutes: widget.intervalMinutes,
+        maxSlots: ReminderScheduler.intervalSlotLimit,
         isQuiet: quiet.contains,
       );
       String message;

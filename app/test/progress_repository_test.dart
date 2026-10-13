@@ -129,12 +129,14 @@ void main() {
       slotHour: 8,
       slotMinute: 30,
       status: DeskBreakLogStatus.done,
+      logDate: DateTime.now(),
     );
     await repo.recordResponse(
       type: DeskBreakType.eye,
       slotHour: 9,
       slotMinute: 0,
       status: DeskBreakLogStatus.skipped,
+      logDate: DateTime.now(),
     );
     await repo.recordResponse(
       type: DeskBreakType.eye,

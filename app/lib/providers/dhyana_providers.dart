@@ -1,3 +1,4 @@
+import 'calendar_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/entities.dart';
@@ -7,17 +8,20 @@ final dhyanaRefreshProvider = StateProvider<int>((ref) => 0);
 
 final dhyanaSessionsTodayProvider = FutureProvider.autoDispose<List<DhyanaSession>>((ref) async {
   ref.watch(dhyanaRefreshProvider);
-  return ref.watch(dhyanaRepositoryProvider).forDay(DateTime.now());
+  return ref.watch(dhyanaRepositoryProvider).forDay(ref.watch(currentDayProvider));
 });
 
 /// Date currently selected in the sessions log, defaulting to today.
-final dhyanaSelectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final dhyanaSelectedDateProvider = StateProvider<DateTime?>((ref) => null);
+final dhyanaEffectiveDateProvider = Provider<DateTime>(
+  (ref) => ref.watch(dhyanaSelectedDateProvider) ?? ref.watch(currentDayProvider),
+);
 
 final dhyanaSessionsForSelectedDateProvider = FutureProvider.autoDispose<List<DhyanaSession>>((
   ref,
 ) async {
   ref.watch(dhyanaRefreshProvider);
-  final date = ref.watch(dhyanaSelectedDateProvider);
+  final date = ref.watch(dhyanaEffectiveDateProvider);
   return ref.watch(dhyanaRepositoryProvider).forDay(date);
 });
 
@@ -26,10 +30,13 @@ final dhyanaSessionsForSelectedDateProvider = FutureProvider.autoDispose<List<Dh
 /// more consistent" weeks.
 final dhyanaWeekMinutesProvider = FutureProvider.autoDispose<int>((ref) async {
   ref.watch(dhyanaRefreshProvider);
-  return ref.watch(dhyanaRepositoryProvider).totalMinutesForLastDays(7);
+  return ref
+      .watch(dhyanaRepositoryProvider)
+      .totalMinutesForLastDays(7, now: ref.watch(currentDayProvider));
 });
 
 final dhyanaStreakProvider = FutureProvider.autoDispose<int>((ref) async {
   ref.watch(dhyanaRefreshProvider);
+  ref.watch(currentDayProvider);
   return ref.watch(dhyanaRepositoryProvider).currentStreakDays();
 });

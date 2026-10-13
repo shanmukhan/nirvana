@@ -1,6 +1,6 @@
 # Play Store listing copy
 
-Draft copy for the Play Store listing. Update once the app is closer to release (e.g. once Exercise/Food/Desk Breaks/Progress/Settings are live — see PROJECT_PLAN.md §7 for current build status).
+Draft copy for the Play Store listing. Reviewed against source on 12 October 2026. Publication status has not been verified; see the current gap review and release build log.
 
 ## Short description (max 80 characters)
 
@@ -19,13 +19,13 @@ Built around one simple idea: consistency beats perfection. A good day isn't a p
 WHAT NIRVANA HELPS WITH
 
 💧 Hydration
-Quick-log buttons, a daily progress ring, and reminders that ease off automatically as bedtime approaches — no guilt if you miss one.
+Quick-log buttons, a daily progress ring, and reminders at your chosen interval during active hours — no guilt if you miss one.
 
 🦵 Knee & joint care
 Log pain, swelling, and stiffness in seconds. Nirvana watches for warning signs (sharp pain, swelling, locking, giving-way) and gently suggests seeing a professional when they show up — it never tells you to push through pain.
 
 🧘 Dhyana (meditation)
-A soft, distraction-free timer with a start and end bell. Choose breath awareness, a body scan, or simple counting. Sessions of any length count — there's no minimum, and a missed day is just a missed day.
+A soft, distraction-free timer with pause/resume and start/end sound cues. Choose breath awareness, a body scan, or simple counting. Sessions of any length count — there's no minimum, and a missed day is just a missed day.
 
 🏋️ Exercise
 Guided sessions for knee-friendly strength work — sets, reps, timers, and a pain check-in after every session, so you always know when to ease off.
@@ -46,7 +46,7 @@ WHY IT'S DIFFERENT
 
 • No shame, ever. Missed a day? That's fine — tomorrow is still there.
 • Your data stays on your device. Nirvana works fully offline.
-• Every schedule is yours to configure — reminder times, intervals, and goals aren't locked in.
+• Configure reminder times, intervals, and your hydration goal.
 • Nirvana never diagnoses or treats any condition. It's a lifestyle companion, not a medical device — always follow your own clinician's advice.
 
 Nirvana is built for people who want steady, sustainable habits — not a 30-day extreme challenge.

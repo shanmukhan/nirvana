@@ -15,6 +15,7 @@ class PhoneUsagePrefs {
   static const _thresholdMinutesKey = 'phone_usage_threshold_minutes';
   static const _snoozeMinutesKey = 'phone_usage_snooze_minutes';
   static const _snoozedUntilKey = 'phone_usage_snoozed_until_epoch_ms';
+  static const _lastWarnedSessionKey = 'phone_usage_last_warned_session_epoch_ms';
 
   static const defaultThresholdMinutes = 15;
   static const defaultSnoozeMinutes = 15;
@@ -35,6 +36,16 @@ class PhoneUsagePrefs {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.get(_enabledKey);
     return value is bool ? value : true;
+  }
+
+  static Future<bool> hasWarnedFor(DateTime sessionStart) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_lastWarnedSessionKey) == sessionStart.millisecondsSinceEpoch;
+  }
+
+  static Future<void> markWarned(DateTime sessionStart) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_lastWarnedSessionKey, sessionStart.millisecondsSinceEpoch);
   }
 
   static Future<void> setEnabled(bool enabled) async {

@@ -22,6 +22,7 @@ import '../../services/reminder_prefs.dart';
 import '../../services/reminder_scheduler.dart';
 import '../reminder_coverage.dart';
 import '../screen_scaffold.dart';
+import 'notification_diagnostics_card.dart';
 
 /// RoutineConfig editor + reminders — this is where "configurable, not
 /// hard-coded" is enforced. See PROJECT_PLAN.md §3 and
@@ -51,6 +52,8 @@ class SettingsScreen extends StatelessWidget {
           _HydrationGoalCard(),
           SizedBox(height: 24),
           _SectionHeader('Reminders'),
+          SizedBox(height: 8),
+          NotificationDiagnosticsCard(),
           SizedBox(height: 8),
           _WaterReminderCard(),
           SizedBox(height: 12),
@@ -120,7 +123,7 @@ class _HydrationGoalCardState extends ConsumerState<_HydrationGoalCard> {
         profile.routineConfigId,
         HydrationConfig(dailyGoalMl: goal, quickLogAmountsMl: config.quickLogAmountsMl),
       );
-      refresh.state++;
+      if (refresh.mounted) refresh.state++;
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +166,8 @@ class _HydrationGoalCardState extends ConsumerState<_HydrationGoalCard> {
                 const SizedBox(height: 4),
                 Text(
                   'Drives the progress ring on Water, the Dashboard card, and the '
-                  'weekly consistency chart.',
+                  'weekly consistency chart. Past consistency is measured '
+                  'against your current goal.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -763,7 +767,7 @@ class _BatteryOptimizationCardState extends State<_BatteryOptimizationCard>
                 children: [
                   Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
-                  const Text('Exempted — reminders can run unrestricted.'),
+                  const Text('Battery exemption allowed.'),
                 ],
               )
             else ...[
@@ -795,7 +799,7 @@ class _BatteryOptimizationCardState extends State<_BatteryOptimizationCard>
                   children: [
                     Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
-                    const Text('Allowed — reminders fire on time.'),
+                    const Text('Exact alarm permission allowed.'),
                   ],
                 )
               else

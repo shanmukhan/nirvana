@@ -22,11 +22,13 @@ Future<Set<String>> daysWithRecords(
   String column,
   int days, {
   DateTime? now,
+  String? predicate,
 }) async {
   RangeError.checkValueInInterval(days, 1, 3660, 'days');
   final today = startOfDay(now ?? DateTime.now());
   final rows = await db.rawQuery(
-    'SELECT DISTINCT substr($column, 1, 10) AS day FROM $table WHERE $column >= ? AND $column < ?',
+    'SELECT DISTINCT substr($column, 1, 10) AS day FROM $table WHERE $column >= ? AND $column < ?'
+    '${predicate == null ? '' : ' AND ($predicate)'}',
     [
       calendarDayOffset(today, 1 - days).toIso8601String(),
       calendarDayOffset(today, 1).toIso8601String(),

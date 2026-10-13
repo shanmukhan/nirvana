@@ -64,6 +64,7 @@ const List<String> createTableStatements = [
     exercise_definition_id TEXT NOT NULL REFERENCES exercise_definition(id),
     completed_sets INTEGER NOT NULL,
     completed_reps INTEGER NOT NULL,
+    partial_reps INTEGER NOT NULL DEFAULT 0,
     pain_rating_0_10 INTEGER,
     feedback TEXT NOT NULL DEFAULT 'fine'
   )
@@ -156,9 +157,10 @@ const List<List<String>> migrationStatements = [
     ''',
     'CREATE INDEX idx_desk_break_log_log_date ON desk_break_log(log_date)',
   ],
+  ['ALTER TABLE exercise_session ADD COLUMN partial_reps INTEGER NOT NULL DEFAULT 0'],
 ];
 
-const int latestSchemaVersion = 2;
+const int latestSchemaVersion = 3;
 
 const List<String> createIndexStatements = [
   'CREATE INDEX idx_weight_entry_taken_at ON weight_entry(taken_at)',

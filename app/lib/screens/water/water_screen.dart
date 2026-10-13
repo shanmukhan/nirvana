@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../providers/repository_providers.dart';
 import '../../providers/water_providers.dart';
 import '../screen_scaffold.dart';
+import 'water_log_actions.dart';
 
 /// Quick-log buttons, progress ring, reminders with snooze/skip.
 /// See health-plan-source.md §3.
@@ -40,11 +40,7 @@ class _WaterBody extends ConsumerWidget {
   final int goalMl;
   final List<int> quickLogAmountsMl;
 
-  const _WaterBody({
-    required this.totalMl,
-    required this.goalMl,
-    required this.quickLogAmountsMl,
-  });
+  const _WaterBody({required this.totalMl, required this.goalMl, required this.quickLogAmountsMl});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -86,10 +82,9 @@ class _WaterBody extends ConsumerWidget {
           children: [
             for (final amount in quickLogAmountsMl)
               FilledButton.tonal(
-                onPressed: () async {
-                  await ref.read(waterRepositoryProvider).log(amount);
-                  ref.read(waterRefreshProvider.notifier).state++;
-                },
+                onPressed: ref.watch(waterSavingProvider)
+                    ? null
+                    : () => saveWater(context, ref, amount),
                 child: Text('+$amount ml'),
               ),
           ],
@@ -112,6 +107,7 @@ class _CustomAmountRow extends ConsumerStatefulWidget {
 
 class _CustomAmountRowState extends ConsumerState<_CustomAmountRow> {
   final _controller = TextEditingController();
+  String? _error;
 
   @override
   void dispose() {
@@ -121,11 +117,14 @@ class _CustomAmountRowState extends ConsumerState<_CustomAmountRow> {
 
   Future<void> _logCustomAmount() async {
     final amount = int.tryParse(_controller.text.trim());
-    if (amount == null || amount <= 0) return;
-    await ref.read(waterRepositoryProvider).log(amount);
-    ref.read(waterRefreshProvider.notifier).state++;
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Enter an amount greater than zero.');
+      return;
+    }
+    setState(() => _error = null);
+    final saved = await saveWater(context, ref, amount);
+    if (!mounted || !saved) return;
     _controller.clear();
-    if (!mounted) return;
     FocusScope.of(context).unfocus();
   }
 
@@ -137,7 +136,8 @@ class _CustomAmountRowState extends ConsumerState<_CustomAmountRow> {
           child: TextField(
             controller: _controller,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
+              errorText: _error,
               labelText: 'Custom amount (ml)',
               border: OutlineInputBorder(),
             ),
@@ -145,7 +145,10 @@ class _CustomAmountRowState extends ConsumerState<_CustomAmountRow> {
           ),
         ),
         const SizedBox(width: 12),
-        FilledButton(onPressed: _logCustomAmount, child: const Text('Log')),
+        FilledButton(
+          onPressed: ref.watch(waterSavingProvider) ? null : _logCustomAmount,
+          child: const Text('Log'),
+        ),
       ],
     );
   }
@@ -173,9 +176,7 @@ class _WeeklyConsistencyCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text('This week', style: Theme.of(context).textTheme.titleMedium),
-                ),
+                Expanded(child: Text('This week', style: Theme.of(context).textTheme.titleMedium)),
                 streakAsync.when(
                   loading: () => const SizedBox.shrink(),
                   error: (e, _) => const SizedBox.shrink(),
@@ -245,7 +246,10 @@ class _DayBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(DateFormat.E().format(day).substring(0, 1), style: Theme.of(context).textTheme.labelSmall),
+        Text(
+          DateFormat.E().format(day).substring(0, 1),
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
       ],
     );
   }

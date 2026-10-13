@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
 import '../../domain/log_validation.dart';
 import 'date_queries.dart';
@@ -110,28 +111,43 @@ class ExerciseRepository {
     required String exerciseDefinitionId,
     required int completedSets,
     required int completedReps,
+    int partialReps = 0,
     int? painRating0to10,
     ExerciseFeedback feedback = ExerciseFeedback.fine,
     DateTime? performedAt,
   }) async {
     requireNonNegativeNumber(completedSets, 'completedSets');
     requireNonNegativeNumber(completedReps, 'completedReps');
+    requireNonNegativeNumber(partialReps, 'partialReps');
+    if (completedSets * completedReps + partialReps == 0) {
+      throw ArgumentError('Complete at least one rep before saving.');
+    }
     requireRating(painRating0to10, 'painRating0to10');
+    final definitions = await _db.query(
+      'exercise_definition',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [exerciseDefinitionId],
+      limit: 1,
+    );
+    if (definitions.isEmpty) throw ArgumentError('Unknown exercise definition.');
     final session = ExerciseSession(
       id: newId(),
       performedAt: performedAt ?? DateTime.now(),
       exerciseDefinitionId: exerciseDefinitionId,
       completedSets: completedSets,
       completedReps: completedReps,
+      partialReps: partialReps,
       painRating0to10: painRating0to10,
       feedback: feedback,
     );
     await _db.insert('exercise_session', {
       'id': session.id,
-      'performed_at': session.performedAt.toIso8601String(),
+      'performed_at': localTimestamp(session.performedAt),
       'exercise_definition_id': session.exerciseDefinitionId,
       'completed_sets': session.completedSets,
       'completed_reps': session.completedReps,
+      'partial_reps': session.partialReps,
       'pain_rating_0_10': session.painRating0to10,
       'feedback': session.feedback.name,
     });
@@ -154,6 +170,7 @@ class ExerciseRepository {
             exerciseDefinitionId: row['exercise_definition_id'] as String,
             completedSets: row['completed_sets'] as int,
             completedReps: row['completed_reps'] as int,
+            partialReps: row['partial_reps'] as int,
             painRating0to10: row['pain_rating_0_10'] as int?,
             feedback: ExerciseFeedback.values.byName(row['feedback'] as String),
           ),
@@ -161,6 +178,12 @@ class ExerciseRepository {
         .toList();
   }
 
-  Future<Set<String>> loggedDays(int days, {DateTime? now}) =>
-      daysWithRecords(_db, 'exercise_session', 'performed_at', days, now: now);
+  Future<Set<String>> loggedDays(int days, {DateTime? now}) => daysWithRecords(
+    _db,
+    'exercise_session',
+    'performed_at',
+    days,
+    now: now,
+    predicate: '(completed_sets * completed_reps + partial_reps) > 0',
+  );
 }

@@ -72,16 +72,8 @@ const Map<MealType, List<MealTemplate>> mealTemplates = {
     ),
   ],
   MealType.eveningSnack: [
-    MealTemplate(
-      label: 'Almonds',
-      description: '10-15 almonds',
-      proteinEstimateG: 6,
-    ),
-    MealTemplate(
-      label: 'Roasted chana',
-      description: 'Roasted chana portion',
-      proteinEstimateG: 7,
-    ),
+    MealTemplate(label: 'Almonds', description: '10-15 almonds', proteinEstimateG: 6),
+    MealTemplate(label: 'Roasted chana', description: 'Roasted chana portion', proteinEstimateG: 7),
     MealTemplate(label: 'Curd', description: 'A bowl of curd', proteinEstimateG: 4),
     MealTemplate(label: 'Buttermilk', description: 'A glass of buttermilk', proteinEstimateG: 3),
     MealTemplate(label: 'Fruit', description: 'A piece of seasonal fruit', proteinEstimateG: 1),

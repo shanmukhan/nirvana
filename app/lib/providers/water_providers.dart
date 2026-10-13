@@ -1,3 +1,4 @@
+import 'calendar_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/routine_config.dart';
@@ -7,7 +8,7 @@ import 'repository_providers.dart';
 /// log to make this re-fetch.
 final waterTodayTotalProvider = FutureProvider.autoDispose<int>((ref) async {
   ref.watch(waterRefreshProvider);
-  return ref.watch(waterRepositoryProvider).totalMlForDay(DateTime.now());
+  return ref.watch(waterRepositoryProvider).totalMlForDay(ref.watch(currentDayProvider));
 });
 
 /// Simple invalidation counter: incrementing it invalidates
@@ -34,11 +35,11 @@ const int hydrationChartDays = 7;
 
 /// Per-day totals for the last [hydrationChartDays] days (oldest first),
 /// for the weekly consistency chart on the Water screen.
-final weeklyWaterTotalsProvider = FutureProvider.autoDispose<List<MapEntry<DateTime, int>>>((
-  ref,
-) {
+final weeklyWaterTotalsProvider = FutureProvider.autoDispose<List<MapEntry<DateTime, int>>>((ref) {
   ref.watch(waterRefreshProvider);
-  return ref.watch(waterRepositoryProvider).dailyTotalsForLastDays(hydrationChartDays);
+  return ref
+      .watch(waterRepositoryProvider)
+      .dailyTotalsForLastDays(hydrationChartDays, now: ref.watch(currentDayProvider));
 });
 
 /// Current consistency streak: consecutive days (ending today, or ending
@@ -47,23 +48,8 @@ final weeklyWaterTotalsProvider = FutureProvider.autoDispose<List<MapEntry<DateT
 /// non-shaming, per PROJECT_PLAN.md §1.
 final waterStreakProvider = FutureProvider.autoDispose<int>((ref) async {
   ref.watch(waterRefreshProvider);
-  final totals = await ref.watch(waterRepositoryProvider).dailyTotalsForLastDays(30);
-  final goal = (await ref.watch(hydrationConfigProvider.future)).dailyGoalMl;
-  final byDayDesc = totals.reversed.toList();
-
-  var streak = 0;
-  var start = 0;
-  // Today not having hit goal yet doesn't break a streak that's still
-  // "in progress" — just don't count today itself until it clears the bar.
-  if (byDayDesc.isNotEmpty && byDayDesc.first.value < goal) {
-    start = 1;
-  }
-  for (var i = start; i < byDayDesc.length; i++) {
-    if (byDayDesc[i].value >= goal) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-  return streak;
+  final repository = ref.watch(waterRepositoryProvider);
+  final today = ref.watch(currentDayProvider);
+  final config = ref.watch(hydrationConfigProvider.future);
+  return repository.currentStreakDays(goalMl: (await config).dailyGoalMl, now: today);
 });

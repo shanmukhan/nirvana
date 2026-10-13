@@ -42,8 +42,8 @@ class _AdherenceCard extends ConsumerWidget {
             Text('Last 7 days', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'How often each break notification was answered — a missed '
-              'notification is counted as "not done" a few minutes after it fires.',
+              'Scheduled breaks are checked when the app opens. Unanswered '
+              'means no response was logged; notification delivery is unknown.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -74,15 +74,16 @@ class _AdherenceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = counts[DeskBreakLogStatus.done] ?? 0;
     final skipped = counts[DeskBreakLogStatus.skipped] ?? 0;
-    final missed = counts[DeskBreakLogStatus.autoMissed] ?? 0;
-    final total = done + skipped + missed;
+    final unanswered =
+        (counts[DeskBreakLogStatus.autoMissed] ?? 0) + (counts[DeskBreakLogStatus.unanswered] ?? 0);
+    final total = done + skipped + unanswered;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Expanded(child: Text(type.label)),
           Text(
-            total == 0 ? 'No data yet' : '$done done · ${skipped + missed} missed',
+            total == 0 ? 'No data yet' : '$done done · $skipped skipped · $unanswered unanswered',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

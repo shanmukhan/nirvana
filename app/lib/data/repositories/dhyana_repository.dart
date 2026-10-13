@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
 import '../../domain/log_validation.dart';
 import 'date_queries.dart';
@@ -80,7 +81,7 @@ class DhyanaRepository {
 
   Map<String, dynamic> _toRow(DhyanaSession session) => {
     'id': session.id,
-    'date': session.date.toIso8601String(),
+    'date': localTimestamp(session.date),
     'planned_duration_min': session.plannedDurationMin,
     'actual_duration_min': session.actualDurationMin,
     'practice_type': session.practiceType.name,

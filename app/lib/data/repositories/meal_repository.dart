@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
 import '../../domain/log_validation.dart';
 import 'date_queries.dart';
@@ -32,7 +33,7 @@ class MealRepository {
     );
     await _db.insert('meal_entry', {
       'id': entry.id,
-      'logged_at': entry.loggedAt.toIso8601String(),
+      'logged_at': localTimestamp(entry.loggedAt),
       'meal_type': entry.mealType.name,
       'description': entry.description,
       'protein_estimate_g': entry.proteinEstimateG,
