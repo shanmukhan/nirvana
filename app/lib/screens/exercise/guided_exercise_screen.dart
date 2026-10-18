@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/entities.dart';
+import '../../domain/session_clock.dart';
 
 /// Sets/reps actually completed by the time the guided session ends
 /// (naturally, or via "Finish now"). Handed back to ExerciseScreen to
@@ -11,8 +12,13 @@ import '../../domain/entities.dart';
 class GuidedExerciseResult {
   final int completedSets;
   final int completedReps;
+  final int partialReps;
 
-  const GuidedExerciseResult({required this.completedSets, required this.completedReps});
+  const GuidedExerciseResult({
+    required this.completedSets,
+    required this.completedReps,
+    this.partialReps = 0,
+  });
 }
 
 enum _Phase { unit, holding, resting, done }
@@ -26,18 +32,70 @@ const _restSeconds = 30;
 /// definitions this walks through.
 class GuidedExerciseScreen extends StatefulWidget {
   final ExerciseDefinition definition;
+  final SessionClock? clock;
 
-  const GuidedExerciseScreen({super.key, required this.definition});
+  const GuidedExerciseScreen({super.key, required this.definition, this.clock});
 
   @override
   State<GuidedExerciseScreen> createState() => _GuidedExerciseScreenState();
 }
 
-class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> {
+class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> with WidgetsBindingObserver {
   late int _currentSet = 1;
   late int _repsDoneInSet = 0;
   _Phase _phase = _Phase.unit;
-  int _remainingSeconds = 0;
+  int _phaseSeconds = 0;
+  late final SessionClock _clock = widget.clock ?? SessionClock();
+  int get _remainingSeconds =>
+      ((_phaseSeconds * 1000 - _clock.elapsed.inMilliseconds + 999) ~/ 1000).clamp(
+        0,
+        _phaseSeconds,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed && _clock.running) _togglePause();
+  }
+
+  void _togglePause() {
+    setState(() {
+      if (_clock.running) {
+        _clock.pause();
+        _timer?.cancel();
+      } else {
+        _clock.resume();
+        _startTicker();
+      }
+    });
+  }
+
+  void _startTicker() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void _tick() {
+    if (!mounted || !_clock.running) return;
+    if (_remainingSeconds == 0) {
+      _timer?.cancel();
+      _clock.reset();
+      if (_phase == _Phase.holding) {
+        HapticFeedback.mediumImpact();
+        _completeUnit();
+      } else if (_phase == _Phase.resting) {
+        _skipRest(nextSet: _currentSet + 1);
+      }
+    } else {
+      setState(() {});
+    }
+  }
+
   Timer? _timer;
 
   bool get _isHold => widget.definition.holdSeconds != null;
@@ -45,22 +103,17 @@ class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   void _startHold() {
     setState(() {
       _phase = _Phase.holding;
-      _remainingSeconds = widget.definition.holdSeconds!;
+      _phaseSeconds = widget.definition.holdSeconds!;
+      _clock.start();
     });
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _remainingSeconds--);
-      if (_remainingSeconds <= 0) {
-        _timer?.cancel();
-        HapticFeedback.mediumImpact();
-        _completeUnit();
-      }
-    });
+    _startTicker();
   }
 
   void _completeUnit() {
@@ -72,6 +125,7 @@ class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> {
           _phase = _Phase.done;
         });
       } else {
+        _repsDoneInSet = reps;
         _startRest(nextSet: _currentSet + 1);
       }
     } else {
@@ -85,18 +139,15 @@ class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> {
   void _startRest({required int nextSet}) {
     setState(() {
       _phase = _Phase.resting;
-      _remainingSeconds = _restSeconds;
+      _phaseSeconds = _restSeconds;
+      _clock.start();
     });
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _remainingSeconds--);
-      if (_remainingSeconds <= 0) {
-        _skipRest(nextSet: nextSet);
-      }
-    });
+    _startTicker();
   }
 
   void _skipRest({required int nextSet}) {
     _timer?.cancel();
+    _clock.reset();
     setState(() {
       _currentSet = nextSet;
       _repsDoneInSet = 0;
@@ -106,11 +157,15 @@ class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> {
 
   void _finishNow() {
     _timer?.cancel();
-    final completedSets = _repsDoneInSet > 0 ? _currentSet : _currentSet - 1;
+    final completedSets = _phase == _Phase.resting || _phase == _Phase.done
+        ? _currentSet
+        : _currentSet - 1;
+    final partial = _phase == _Phase.unit || _phase == _Phase.holding ? _repsDoneInSet : 0;
     Navigator.of(context).pop(
       GuidedExerciseResult(
         completedSets: completedSets.clamp(0, widget.definition.defaultSets),
-        completedReps: widget.definition.defaultReps,
+        completedReps: completedSets > 0 ? widget.definition.defaultReps : 0,
+        partialReps: partial,
       ),
     );
   }
@@ -156,6 +211,12 @@ class _GuidedExerciseScreenState extends State<GuidedExerciseScreen> {
           ),
         const SizedBox(height: 32),
         Expanded(child: Center(child: _buildCenter(context))),
+        if (_phase == _Phase.holding || _phase == _Phase.resting)
+          TextButton.icon(
+            onPressed: _togglePause,
+            icon: Icon(_clock.running ? Icons.pause : Icons.play_arrow),
+            label: Text(_clock.running ? 'Pause' : 'Resume'),
+          ),
         const SizedBox(height: 16),
         Text(
           widget.definition.instructions,

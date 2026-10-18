@@ -52,20 +52,14 @@ class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: isDark
-          ? const Color(0xFF0F231D)
-          : const Color(0xFFF4FAF7),
+      scaffoldBackgroundColor: isDark ? const Color(0xFF0F231D) : const Color(0xFFF4FAF7),
       appBarTheme: const AppBarTheme(
         backgroundColor: NirvanaColors.barGreen,
         foregroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 2,
         centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-        ),
+        titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       cardTheme: CardThemeData(
@@ -113,9 +107,7 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? colorScheme.primary
-              : null,
+          (states) => states.contains(WidgetState.selected) ? colorScheme.primary : null,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)

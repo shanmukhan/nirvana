@@ -47,11 +47,7 @@ class WaterEntry {
   final DateTime loggedAt;
   final int amountMl;
 
-  const WaterEntry({
-    required this.id,
-    required this.loggedAt,
-    required this.amountMl,
-  });
+  const WaterEntry({required this.id, required this.loggedAt, required this.amountMl});
 }
 
 enum MealType { breakfast, midMorning, lunch, eveningSnack, dinner }
@@ -100,6 +96,7 @@ class ExerciseSession {
   final String exerciseDefinitionId;
   final int completedSets;
   final int completedReps;
+  final int partialReps;
   final int? painRating0to10;
   final ExerciseFeedback feedback;
 
@@ -109,9 +106,12 @@ class ExerciseSession {
     required this.exerciseDefinitionId,
     required this.completedSets,
     required this.completedReps,
+    this.partialReps = 0,
     this.painRating0to10,
     this.feedback = ExerciseFeedback.fine,
   });
+  int get totalReps => completedSets * completedReps + partialReps;
+  bool get hasWork => totalReps > 0;
 }
 
 /// Pain/swelling/stiffness log per health-plan-source.md §8.
@@ -205,11 +205,7 @@ class HabitCompletion {
   final DateTime completedAt;
   final HabitType habitType;
 
-  const HabitCompletion({
-    required this.id,
-    required this.completedAt,
-    required this.habitType,
-  });
+  const HabitCompletion({required this.id, required this.completedAt, required this.habitType});
 }
 
 enum ReminderPriority { high, medium, low }

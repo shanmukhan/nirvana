@@ -1,6 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
+import '../../domain/log_validation.dart';
+import 'date_queries.dart';
 import 'id_generator.dart';
 
 class PainRepository {
@@ -20,6 +24,11 @@ class PainRepository {
     bool givingWay = false,
     DateTime? recordedAt,
   }) async {
+    requireRating(painBefore0to10, 'painBefore0to10');
+    requireRating(painDuring0to10, 'painDuring0to10');
+    requireRating(painAfter1to2h0to10, 'painAfter1to2h0to10');
+    requireRating(painNextMorning0to10, 'painNextMorning0to10');
+    requireRating(stiffness0to10, 'stiffness0to10');
     final entry = PainEntry(
       id: newId(),
       recordedAt: recordedAt ?? DateTime.now(),
@@ -38,11 +47,7 @@ class PainRepository {
   }
 
   Future<List<PainEntry>> recent({int limit = 90}) async {
-    final rows = await _db.query(
-      'pain_entry',
-      orderBy: 'recorded_at DESC',
-      limit: limit,
-    );
+    final rows = await _db.query('pain_entry', orderBy: 'recorded_at DESC', limit: limit);
     return rows.map(_fromRow).toList();
   }
 
@@ -51,9 +56,29 @@ class PainRepository {
     return rows.isEmpty ? null : rows.first;
   }
 
+  Future<List<PainEntry>> forDay(DateTime day) async => (await queryDateRange(
+    _db,
+    'pain_entry',
+    'recorded_at',
+    startOfDay(day),
+    calendarDayOffset(day, 1),
+  )).map(_fromRow).toList();
+
+  Future<List<PainEntry>> lastDays(int days, {DateTime? now}) async {
+    RangeError.checkValueInInterval(days, 1, 3660, 'days');
+    final today = now ?? DateTime.now();
+    return (await queryDateRange(
+      _db,
+      'pain_entry',
+      'recorded_at',
+      calendarDayOffset(today, 1 - days),
+      calendarDayOffset(today, 1),
+    )).map(_fromRow).toList();
+  }
+
   Map<String, dynamic> _toRow(PainEntry e) => {
     'id': e.id,
-    'recorded_at': e.recordedAt.toIso8601String(),
+    'recorded_at': localTimestamp(e.recordedAt),
     'pain_before_0_10': e.painBefore0to10,
     'pain_during_0_10': e.painDuring0to10,
     'pain_after_1_2h_0_10': e.painAfter1to2h0to10,

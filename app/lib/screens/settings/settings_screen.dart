@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../data/repositories/backup_repository.dart';
 import '../../domain/routine_config.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/water_providers.dart';
@@ -19,7 +20,9 @@ import '../../services/phone_usage_prefs.dart';
 import '../../services/phone_usage_service.dart';
 import '../../services/reminder_prefs.dart';
 import '../../services/reminder_scheduler.dart';
+import '../reminder_coverage.dart';
 import '../screen_scaffold.dart';
+import 'notification_diagnostics_card.dart';
 
 /// RoutineConfig editor + reminders — this is where "configurable, not
 /// hard-coded" is enforced. See PROJECT_PLAN.md §3 and
@@ -49,6 +52,8 @@ class SettingsScreen extends StatelessWidget {
           _HydrationGoalCard(),
           SizedBox(height: 24),
           _SectionHeader('Reminders'),
+          SizedBox(height: 8),
+          NotificationDiagnosticsCard(),
           SizedBox(height: 8),
           _WaterReminderCard(),
           SizedBox(height: 12),
@@ -104,6 +109,36 @@ class _HydrationGoalCard extends ConsumerStatefulWidget {
 
 class _HydrationGoalCardState extends ConsumerState<_HydrationGoalCard> {
   int? _goalMl;
+  bool _saving = false;
+
+  Future<void> _saveGoal(int goal, HydrationConfig config) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    final profileFuture = ref.read(userProfileProvider.future);
+    final repository = ref.read(routineConfigRepositoryProvider);
+    final refresh = ref.read(hydrationConfigRefreshProvider.notifier);
+    try {
+      final profile = await profileFuture;
+      await repository.setHydrationConfig(
+        profile.routineConfigId,
+        HydrationConfig(dailyGoalMl: goal, quickLogAmountsMl: config.quickLogAmountsMl),
+      );
+      if (refresh.mounted) refresh.state++;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save the hydration goal. Please try again.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _goalMl = null;
+          _saving = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +166,8 @@ class _HydrationGoalCardState extends ConsumerState<_HydrationGoalCard> {
                 const SizedBox(height: 4),
                 Text(
                   'Drives the progress ring on Water, the Dashboard card, and the '
-                  'weekly consistency chart.',
+                  'weekly consistency chart. Past consistency is measured '
+                  'against your current goal.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -142,20 +178,8 @@ class _HydrationGoalCardState extends ConsumerState<_HydrationGoalCard> {
                   max: 4000,
                   divisions: 30,
                   label: '$goal ml',
-                  onChanged: (v) => setState(() => _goalMl = v.round()),
-                  onChangeEnd: (v) async {
-                    final profile = await ref.read(userProfileProvider.future);
-                    await ref
-                        .read(routineConfigRepositoryProvider)
-                        .setHydrationConfig(
-                          profile.routineConfigId,
-                          HydrationConfig(
-                            dailyGoalMl: v.round(),
-                            quickLogAmountsMl: config.quickLogAmountsMl,
-                          ),
-                        );
-                    ref.read(hydrationConfigRefreshProvider.notifier).state++;
-                  },
+                  onChanged: _saving ? null : (v) => setState(() => _goalMl = v.round()),
+                  onChangeEnd: _saving ? null : (v) => _saveGoal(v.round(), config),
                 ),
               ],
             ),
@@ -196,13 +220,19 @@ class _QuietHoursConflictWarning extends StatelessWidget {
       future: QuietHoursWindow.load(),
       builder: (context, snapshot) {
         final window = snapshot.data;
-        if (window == null || !window.contains(timeMinutes)) return const SizedBox.shrink();
+        if (window == null || !window.contains(timeMinutes)) {
+          return const SizedBox.shrink();
+        }
         return Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.warning_amber_rounded, size: 16, color: Theme.of(context).colorScheme.error),
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 16,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -248,9 +278,7 @@ class _ReminderCardShell extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-                ),
+                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
                 Switch(value: enabled, onChanged: onEnabledChanged),
               ],
             ),
@@ -342,6 +370,11 @@ class _WaterReminderCardState extends State<_WaterReminderCard> {
             await ReminderPrefs.setWaterToMinutes(picked);
             await ReminderScheduler.instance.rescheduleWater();
           },
+        ),
+        ReminderCoverage(
+          fromMinutes: _fromMinutes,
+          toMinutes: _toMinutes,
+          intervalMinutes: _intervalMinutes,
         ),
       ],
     );
@@ -734,7 +767,7 @@ class _BatteryOptimizationCardState extends State<_BatteryOptimizationCard>
                 children: [
                   Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
-                  const Text('Exempted — reminders can run unrestricted.'),
+                  const Text('Battery exemption allowed.'),
                 ],
               )
             else ...[
@@ -766,7 +799,7 @@ class _BatteryOptimizationCardState extends State<_BatteryOptimizationCard>
                   children: [
                     Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
-                    const Text('Allowed — reminders fire on time.'),
+                    const Text('Exact alarm permission allowed.'),
                   ],
                 )
               else
@@ -942,60 +975,119 @@ class _BackupCard extends ConsumerStatefulWidget {
 class _BackupCardState extends ConsumerState<_BackupCard> {
   bool _busy = false;
 
+  static const _backupLabels = {
+    'user_profile': 'Profile',
+    'routine_config': 'Routine settings',
+    'weight_entry': 'Weigh-ins',
+    'water_entry': 'Water logs',
+    'meal_entry': 'Meals',
+    'exercise_definition': 'Exercise library',
+    'exercise_session': 'Exercise sessions',
+    'pain_entry': 'Knee check-ins',
+    'sleep_entry': 'Sleep logs',
+    'dhyana_session': 'Meditation sessions',
+    'habit_completion': 'Completed habits',
+    'reminder': 'Reminders',
+    'desk_break_log': 'Desk breaks',
+  };
+
   Future<void> _export() async {
+    if (_busy) return;
     setState(() => _busy = true);
+    File? file;
     try {
       final json = await ref.read(backupRepositoryProvider).exportToJson();
       final dir = await getTemporaryDirectory();
-      final fileName = 'nirvana_backup_${DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now())}.json';
-      final file = File(p.join(dir.path, fileName));
-      await file.writeAsString(json);
+      final fileName =
+          'nirvana_backup_${DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now())}.json';
+      file = File(p.join(dir.path, fileName));
+      await file.writeAsString(json, flush: true);
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
       await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)], text: 'Nirvana data backup'),
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Nirvana data backup',
+          sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+        ),
       );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not export backup. Please try again.')));
+      }
     } finally {
+      if (file != null) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+      }
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _import() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-    final path = result?.files.single.path;
-    if (path == null) return;
-    if (!mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Import backup?'),
-        content: const Text(
-          'This replaces all current data — weight, water, meals, exercise, '
-          'pain, sleep, dhyana, and desk-break logs — with the contents of '
-          'the selected file. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Import')),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
+    if (_busy) return;
     setState(() => _busy = true);
     try {
-      final json = await File(path).readAsString();
-      await ref.read(backupRepositoryProvider).importFromJson(json);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      final path = result?.files.single.path;
+      if (path == null) return;
+      final file = File(path);
+      if (await file.length() > BackupRepository.maxBackupBytes) {
+        throw const FormatException('Backup is larger than 16 MB.');
+      }
+      final repository = ref.read(backupRepositoryProvider);
+      final backup = await repository.prepareImport(await file.readAsString());
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Backup imported.')));
-    } catch (e) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Restore backup?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (backup.exportedAt != null)
+                  Text('Exported ${DateFormat.yMMMd().add_jm().format(backup.exportedAt!)}'),
+                Text('${backup.totalRecords} records'),
+                const SizedBox(height: 8),
+                for (final entry in backup.recordCounts.entries)
+                  if (entry.value > 0) Text('${_backupLabels[entry.key]}: ${entry.value}'),
+                const SizedBox(height: 16),
+                const Text(
+                  'This replaces all current health logs and your hydration goal. '
+                  'Export your current data first if you want to keep it. '
+                  'Reminder and phone usage settings stay as they are.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Restore'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      await repository.restore(backup);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      ref.read(databaseRevisionProvider.notifier).state++;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup restored.')));
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is FormatException
+          ? 'Invalid backup: ${error.message}'
+          : 'Could not restore backup. Your current data is unchanged.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1012,8 +1104,9 @@ class _BackupCardState extends ConsumerState<_BackupCard> {
             Text('Backup', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'Export everything you\'ve logged to a file, or restore from a '
-              'previous export.',
+              'Export health logs and your hydration goal, or restore a previous export. '
+              'Backups contain private health data in plain text. '
+              'Store and share them only with people you trust.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),

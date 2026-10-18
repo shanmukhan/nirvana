@@ -15,6 +15,39 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool _timezoneReady = false;
+  bool _zonesLoaded = false;
+
+  Future<void> refreshTimezone() async {
+    if (!_zonesLoaded) {
+      tz_data.initializeTimeZones();
+      _zonesLoaded = true;
+    }
+    _timezoneReady = false;
+    final timezone = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timezone.identifier));
+    _timezoneReady = true;
+  }
+
+  String get timezoneIdentifier => tz.local.name;
+
+  Future<bool?> notificationsEnabled() async {
+    final android = _androidImpl;
+    if (android != null) return android.areNotificationsEnabled();
+    final ios = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    return (await ios?.checkPermissions())?.isEnabled;
+  }
+
+  Future<List<PendingNotificationRequest>> pendingRequests() =>
+      _plugin.pendingNotificationRequests();
+
+  Future<List<String>> blockedChannels() async {
+    final channels = await _androidImpl?.getNotificationChannels();
+    return [
+      for (final channel in channels ?? <AndroidNotificationChannel>[])
+        if (channel.importance == Importance.none) channel.name,
+    ];
+  }
 
   /// Resource name (Android `res/raw`, no extension) / bundled file name
   /// (iOS, with extension) for the generic "Nirvana" reminder tone, used by
@@ -33,15 +66,14 @@ class NotificationService {
   );
   static const String _iosTone = 'nirvana_tone.wav';
 
-  static const AndroidNotificationDetails _highPriorityAndroidDetails =
-      AndroidNotificationDetails(
-        'nirvana_high_v2',
-        'High priority reminders',
-        channelDescription: 'Scheduled exercise reminders',
-        importance: Importance.high,
-        priority: Priority.high,
-        sound: _androidTone,
-      );
+  static const AndroidNotificationDetails _highPriorityAndroidDetails = AndroidNotificationDetails(
+    'nirvana_high_v2',
+    'High priority reminders',
+    channelDescription: 'Scheduled exercise reminders',
+    importance: Importance.high,
+    priority: Priority.high,
+    sound: _androidTone,
+  );
 
   static const AndroidNotificationDetails _mediumPriorityAndroidDetails =
       AndroidNotificationDetails(
@@ -58,19 +90,16 @@ class NotificationService {
   // `sound` field, so eye-distance/neck-exercise reminders never played a
   // sound. Channel importance/sound is immutable once created on a device,
   // hence the new channel id rather than editing nirvana_low_v2 in place.
-  static const AndroidNotificationDetails _lowPriorityAndroidDetails =
-      AndroidNotificationDetails(
-        'nirvana_low_v3',
-        'Low priority reminders',
-        channelDescription: 'Weigh-in reminders',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
-        sound: _androidTone,
-      );
-
-  static const DarwinNotificationDetails _iosDetails = DarwinNotificationDetails(
-    sound: _iosTone,
+  static const AndroidNotificationDetails _lowPriorityAndroidDetails = AndroidNotificationDetails(
+    'nirvana_low_v3',
+    'Low priority reminders',
+    channelDescription: 'Weigh-in reminders',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    sound: _androidTone,
   );
+
+  static const DarwinNotificationDetails _iosDetails = DarwinNotificationDetails(sound: _iosTone);
 
   // Water, Dhyana, Knee (check-in + mobility break), and Eye break each get
   // their own channel/sound so they're distinguishable by ear without
@@ -133,27 +162,22 @@ class NotificationService {
 
   Future<void> init({
     void Function(NotificationResponse response)? onNotificationResponse,
-    DidReceiveBackgroundNotificationResponseCallback?
-    onBackgroundNotificationResponse,
+    DidReceiveBackgroundNotificationResponseCallback? onBackgroundNotificationResponse,
   }) async {
-    if (_initialized) return;
-    tz_data.initializeTimeZones();
-    try {
-      final timezone = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(timezone.identifier));
-    } catch (_) {
-      // Falls back to UTC if the platform timezone name can't be resolved —
-      // scheduled reminders will then be off by the local UTC offset rather
-      // than failing outright.
-    }
+    if (_initialized) return refreshTimezone();
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings();
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidSettings, iOS: iosSettings),
       onDidReceiveNotificationResponse: onNotificationResponse,
       onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationResponse,
     );
     _initialized = true;
+    await refreshTimezone();
   }
 
   /// Details of the notification that launched the app from a killed
@@ -165,19 +189,14 @@ class NotificationService {
 
   Future<bool> requestPermission() async {
     final androidImpl = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (androidImpl != null) {
       return await androidImpl.requestNotificationsPermission() ?? false;
     }
     final iosImpl = _plugin
-        .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >();
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     if (iosImpl != null) {
-      return await iosImpl.requestPermissions(alert: true, badge: true, sound: true) ??
-          false;
+      return await iosImpl.requestPermissions(alert: true, badge: true, sound: true) ?? false;
     }
     return false;
   }
@@ -238,10 +257,7 @@ class NotificationService {
           priority: Priority.defaultPriority,
           sound: _androidTone,
           actions: <AndroidNotificationAction>[
-            AndroidNotificationAction(
-              snoozePhoneUsageActionId,
-              'Snooze $snoozeMinutes min',
-            ),
+            AndroidNotificationAction(snoozePhoneUsageActionId, 'Snooze $snoozeMinutes min'),
           ],
         ),
         iOS: _iosDetails,
@@ -261,10 +277,13 @@ class NotificationService {
     required NotificationChannel channel,
     String? payload,
   }) async {
+    RangeError.checkValueInInterval(hour, 0, 23, 'hour');
+    RangeError.checkValueInInterval(minute, 0, 59, 'minute');
+    if (!_timezoneReady) await refreshTimezone();
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+      scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day + 1, hour, minute);
     }
     final exact = await canScheduleExactAlarms();
     await _plugin.zonedSchedule(
@@ -305,10 +324,7 @@ enum NotificationChannel {
   knee(NotificationService._kneeAndroidDetails, NotificationService._kneeIosDetails),
   eye(NotificationService._eyeAndroidDetails, NotificationService._eyeIosDetails),
   genericHigh(NotificationService._highPriorityAndroidDetails, NotificationService._iosDetails),
-  genericMedium(
-    NotificationService._mediumPriorityAndroidDetails,
-    NotificationService._iosDetails,
-  ),
+  genericMedium(NotificationService._mediumPriorityAndroidDetails, NotificationService._iosDetails),
   genericLow(NotificationService._lowPriorityAndroidDetails, NotificationService._iosDetails);
 
   final AndroidNotificationDetails _androidDetails;

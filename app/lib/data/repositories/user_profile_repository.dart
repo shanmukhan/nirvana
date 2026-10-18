@@ -11,12 +11,12 @@ class UserProfileRepository {
 
   UserProfileRepository(this._db);
 
-  Future<UserProfile> bootstrapIfMissing() async {
-    final existing = await current();
+  Future<UserProfile> bootstrapIfMissing() => _db.transaction((txn) async {
+    final existing = await _current(txn);
     if (existing != null) return existing;
 
     final routineConfigId = newId();
-    await _db.insert('routine_config', {
+    await txn.insert('routine_config', {
       'id': routineConfigId,
       // Full RoutineConfig editing lands in Phase 3 (PROJECT_PLAN.md §7);
       // until then the app runs on the in-code defaults in
@@ -35,7 +35,7 @@ class UserProfileRepository {
       targetWeightMaxKg: 67,
       routineConfigId: routineConfigId,
     );
-    await _db.insert('user_profile', {
+    await txn.insert('user_profile', {
       'id': profile.id,
       'name': profile.name,
       'age_years': profile.ageYears,
@@ -47,10 +47,12 @@ class UserProfileRepository {
       'routine_config_id': profile.routineConfigId,
     });
     return profile;
-  }
+  });
 
-  Future<UserProfile?> current() async {
-    final rows = await _db.query('user_profile', limit: 1);
+  Future<UserProfile?> current() => _current(_db);
+
+  Future<UserProfile?> _current(DatabaseExecutor db) async {
+    final rows = await db.query('user_profile', limit: 1);
     if (rows.isEmpty) return null;
     final row = rows.first;
     return UserProfile(

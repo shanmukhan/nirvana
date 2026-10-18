@@ -1,6 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/calendar_days.dart';
+import '../../domain/stored_dates.dart';
 import '../../domain/entities.dart';
+import '../../domain/log_validation.dart';
+import 'date_queries.dart';
 import 'id_generator.dart';
 
 class DhyanaRepository {
@@ -17,6 +21,10 @@ class DhyanaRepository {
     String? notes,
     DateTime? date,
   }) async {
+    requirePositiveNumber(plannedDurationMin, 'plannedDurationMin');
+    requirePositiveNumber(actualDurationMin, 'actualDurationMin');
+    requireRating(moodBefore1to5, 'moodBefore1to5', min: 1, max: 5);
+    requireRating(moodAfter1to5, 'moodAfter1to5', min: 1, max: 5);
     final session = DhyanaSession(
       id: newId(),
       date: date ?? DateTime.now(),
@@ -32,17 +40,13 @@ class DhyanaRepository {
   }
 
   Future<List<DhyanaSession>> recent({int limit = 60}) async {
-    final rows = await _db.query(
-      'dhyana_session',
-      orderBy: 'date DESC',
-      limit: limit,
-    );
+    final rows = await _db.query('dhyana_session', orderBy: 'date DESC', limit: limit);
     return rows.map(_fromRow).toList();
   }
 
   Future<List<DhyanaSession>> forDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
-    final end = start.add(const Duration(days: 1));
+    final end = calendarDayOffset(start, 1);
     final rows = await _db.query(
       'dhyana_session',
       where: 'date >= ? AND date < ?',
@@ -55,30 +59,29 @@ class DhyanaRepository {
   /// Consecutive days (ending today or yesterday) with at least one session.
   /// A missed day just ends the streak — no punitive copy anywhere else.
   Future<int> currentStreakDays() async {
-    final sessions = await recent(limit: 400);
-    if (sessions.isEmpty) return 0;
-    final daysWithSession = sessions
-        .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
-        .toSet();
+    final rows = await _db.rawQuery(
+      'SELECT DISTINCT substr(date, 1, 10) AS day FROM dhyana_session',
+    );
+    final daysWithSession = rows.map((row) => DateTime.parse(row['day'] as String)).toSet();
 
     var cursor = DateTime.now();
     var cursorDay = DateTime(cursor.year, cursor.month, cursor.day);
     if (!daysWithSession.contains(cursorDay)) {
-      cursorDay = cursorDay.subtract(const Duration(days: 1));
+      cursorDay = calendarDayOffset(cursorDay, -1);
       if (!daysWithSession.contains(cursorDay)) return 0;
     }
 
     var streak = 0;
     while (daysWithSession.contains(cursorDay)) {
       streak++;
-      cursorDay = cursorDay.subtract(const Duration(days: 1));
+      cursorDay = calendarDayOffset(cursorDay, -1);
     }
     return streak;
   }
 
   Map<String, dynamic> _toRow(DhyanaSession session) => {
     'id': session.id,
-    'date': session.date.toIso8601String(),
+    'date': localTimestamp(session.date),
     'planned_duration_min': session.plannedDurationMin,
     'actual_duration_min': session.actualDurationMin,
     'practice_type': session.practiceType.name,
@@ -97,4 +100,20 @@ class DhyanaRepository {
     moodAfter1to5: row['mood_after_1_5'] as int?,
     notes: row['notes'] as String?,
   );
+
+  Future<Set<String>> loggedDays(int days, {DateTime? now}) =>
+      daysWithRecords(_db, 'dhyana_session', 'date', days, now: now);
+
+  Future<int> totalMinutesForLastDays(int days, {DateTime? now}) async {
+    RangeError.checkValueInInterval(days, 1, 3660, 'days');
+    final today = now ?? DateTime.now();
+    final rows = await _db.rawQuery(
+      'SELECT COALESCE(SUM(actual_duration_min), 0) AS total FROM dhyana_session WHERE date >= ? AND date < ?',
+      [
+        calendarDayOffset(today, 1 - days).toIso8601String(),
+        calendarDayOffset(today, 1).toIso8601String(),
+      ],
+    );
+    return rows.first['total'] as int;
+  }
 }

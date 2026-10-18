@@ -17,13 +17,20 @@ class RoutineConfigRepository {
   RoutineConfigRepository(this._db);
 
   Future<HydrationConfig> hydrationConfig(String routineConfigId) async {
-    final json = await _loadJson(routineConfigId);
-    final hydration = json['hydration'];
-    if (hydration is! Map<String, dynamic>) return const HydrationConfig();
-    return HydrationConfig.fromMap(hydration);
+    try {
+      final json = await _loadJson(routineConfigId);
+      final hydration = json['hydration'];
+      if (hydration is! Map<String, dynamic>) return const HydrationConfig();
+      return HydrationConfig.fromMap(hydration);
+    } on FormatException {
+      // Older app versions could save invalid values. Keep the UI usable
+      // until the user saves a valid configuration or restores a backup.
+      return const HydrationConfig();
+    }
   }
 
   Future<void> setHydrationConfig(String routineConfigId, HydrationConfig config) async {
+    config.validate();
     final json = await _loadJson(routineConfigId);
     json['hydration'] = config.toMap();
     await _db.update(

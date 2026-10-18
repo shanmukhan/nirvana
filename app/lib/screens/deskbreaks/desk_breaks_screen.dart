@@ -5,6 +5,7 @@ import '../../data/repositories/desk_break_log_repository.dart';
 import '../../providers/desk_break_providers.dart';
 import '../../services/reminder_prefs.dart';
 import '../../services/reminder_scheduler.dart';
+import '../reminder_coverage.dart';
 import '../screen_scaffold.dart';
 
 /// Eye, movement, knee-mobility, and neck-exercise break reminders on
@@ -20,11 +21,7 @@ class DeskBreaksScreen extends StatelessWidget {
       title: 'Desk Breaks',
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          _AdherenceCard(),
-          SizedBox(height: 16),
-          _DeskBreaksReminderCard(),
-        ],
+        children: const [_AdherenceCard(), SizedBox(height: 16), _DeskBreaksReminderCard()],
       ),
     );
   }
@@ -45,8 +42,8 @@ class _AdherenceCard extends ConsumerWidget {
             Text('Last 7 days', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'How often each break notification was answered — a missed '
-              'notification is counted as "not done" a few minutes after it fires.',
+              'Scheduled breaks are checked when the app opens. Unanswered '
+              'means no response was logged; notification delivery is unknown.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -55,7 +52,8 @@ class _AdherenceCard extends ConsumerWidget {
               error: (e, _) => Text('Could not load adherence: $e'),
               data: (summary) => Column(
                 children: [
-                  for (final type in DeskBreakType.values) _AdherenceRow(type: type, counts: summary[type]!),
+                  for (final type in DeskBreakType.values)
+                    _AdherenceRow(type: type, counts: summary[type]!),
                 ],
               ),
             ),
@@ -76,15 +74,16 @@ class _AdherenceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = counts[DeskBreakLogStatus.done] ?? 0;
     final skipped = counts[DeskBreakLogStatus.skipped] ?? 0;
-    final missed = counts[DeskBreakLogStatus.autoMissed] ?? 0;
-    final total = done + skipped + missed;
+    final unanswered =
+        (counts[DeskBreakLogStatus.autoMissed] ?? 0) + (counts[DeskBreakLogStatus.unanswered] ?? 0);
+    final total = done + skipped + unanswered;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Expanded(child: Text(type.label)),
           Text(
-            total == 0 ? 'No data yet' : '$done done · ${skipped + missed} missed',
+            total == 0 ? 'No data yet' : '$done done · $skipped skipped · $unanswered unanswered',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -253,6 +252,11 @@ class _DeskBreaksReminderCardState extends State<_DeskBreaksReminderCard> {
                 await ReminderPrefs.setDeskBreakIntervalMinutes(type, v.round());
                 await ReminderScheduler.instance.rescheduleDeskBreak(type);
               },
+            ),
+            ReminderCoverage(
+              fromMinutes: _fromMinutes,
+              toMinutes: _toMinutes,
+              intervalMinutes: interval,
             ),
           ],
         ],

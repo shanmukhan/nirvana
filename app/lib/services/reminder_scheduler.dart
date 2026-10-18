@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+
+import '../domain/reminder_plan.dart';
+import 'desk_break_schedule_history.dart';
 import 'notification_service.dart';
 import 'reminder_prefs.dart';
 
@@ -30,6 +34,45 @@ class ReminderScheduler {
 
   static final ReminderScheduler instance = ReminderScheduler._();
 
+  Future<void> _pending = Future.value();
+  final lastError = ValueNotifier<String?>(null);
+  final _failedCategories = <String>{};
+
+  Future<void> _enqueue(String category, Future<void> Function() action) {
+    _pending = _pending.then((_) async {
+      try {
+        await action();
+        if (category == 'All') {
+          _failedCategories.clear();
+        } else {
+          _failedCategories.remove(category);
+          if (category == 'Desk breaks') {
+            _failedCategories.removeAll(DeskBreakType.values.map((type) => type.label));
+          }
+        }
+      } catch (_) {
+        _failedCategories.add(category);
+      }
+      lastError.value = _failedCategories.isEmpty
+          ? null
+          : 'Could not update ${_failedCategories.join(', ')} reminders. Your settings are saved; retry scheduling.';
+    });
+    return _pending;
+  }
+
+  Future<void> rescheduleAll() => _enqueue('All', _rescheduleAll);
+  Future<void> rescheduleWater({QuietHoursWindow? quietHours}) =>
+      _enqueue('Water', () => _rescheduleWater(quietHours: quietHours));
+  Future<void> rescheduleDhyana({QuietHoursWindow? quietHours}) =>
+      _enqueue('Dhyana', () => _rescheduleDhyana(quietHours: quietHours));
+  Future<void> rescheduleKneeCheckin({QuietHoursWindow? quietHours}) =>
+      _enqueue('Knee', () => _rescheduleKneeCheckin(quietHours: quietHours));
+  Future<void> rescheduleWeightCheckin({QuietHoursWindow? quietHours}) =>
+      _enqueue('Weight', () => _rescheduleWeightCheckin(quietHours: quietHours));
+  Future<void> rescheduleDeskBreak(DeskBreakType type, {QuietHoursWindow? quietHours}) =>
+      _enqueue(type.label, () => _rescheduleDeskBreak(type, quietHours: quietHours));
+  Future<void> rescheduleAllDeskBreaks() => _enqueue('Desk breaks', _rescheduleAllDeskBreaks);
+
   static const _waterIdBase = 1000;
   static const _dhyanaId = 2000;
   static const _kneeCheckinId = 4000;
@@ -38,6 +81,9 @@ class ReminderScheduler {
   // category means less total alarm churn per reschedule, on top of only
   // rescheduling the category that actually changed.
   static const _maxSlotsPerCategory = 16;
+  // Five interval categories + three daily reminders + one reserved request.
+  // A fixed allocation avoids cancelling unrelated categories on every edit.
+  static int get intervalSlotLimit => defaultTargetPlatform == TargetPlatform.iOS ? 12 : 16;
 
   static const Map<DeskBreakType, int> _deskBreakIdBase = {
     DeskBreakType.eye: 3000,
@@ -49,74 +95,55 @@ class ReminderScheduler {
   /// Reschedules every category. Only call this from app startup or after
   /// a quiet-hours change — anywhere else, call the specific `reschedule*`
   /// method for the one category that changed (see class doc).
-  Future<void> rescheduleAll() async {
+  Future<void> _rescheduleAll() async {
     final quietHours = await QuietHoursWindow.load();
-    await rescheduleWater(quietHours: quietHours);
-    await rescheduleDhyana(quietHours: quietHours);
-    await rescheduleKneeCheckin(quietHours: quietHours);
-    await rescheduleWeightCheckin(quietHours: quietHours);
+    await _rescheduleWater(quietHours: quietHours);
+    await _rescheduleDhyana(quietHours: quietHours);
+    await _rescheduleKneeCheckin(quietHours: quietHours);
+    await _rescheduleWeightCheckin(quietHours: quietHours);
     for (final type in DeskBreakType.values) {
-      await rescheduleDeskBreak(type, quietHours: quietHours);
+      await _rescheduleDeskBreak(type, quietHours: quietHours);
     }
   }
 
-  Future<void> rescheduleWater({QuietHoursWindow? quietHours}) async {
+  Future<void> _rescheduleWater({QuietHoursWindow? quietHours}) async {
     await _cancelRange(_waterIdBase, _maxSlotsPerCategory);
     await _scheduleWater(quietHours ?? await QuietHoursWindow.load());
   }
 
-  Future<void> rescheduleDhyana({QuietHoursWindow? quietHours}) async {
+  Future<void> _rescheduleDhyana({QuietHoursWindow? quietHours}) async {
     await NotificationService.instance.cancel(_dhyanaId);
     await _scheduleDhyana(quietHours ?? await QuietHoursWindow.load());
   }
 
-  Future<void> rescheduleKneeCheckin({QuietHoursWindow? quietHours}) async {
+  Future<void> _rescheduleKneeCheckin({QuietHoursWindow? quietHours}) async {
     await NotificationService.instance.cancel(_kneeCheckinId);
     await _scheduleKneeCheckin(quietHours ?? await QuietHoursWindow.load());
   }
 
-  Future<void> rescheduleWeightCheckin({QuietHoursWindow? quietHours}) async {
+  Future<void> _rescheduleWeightCheckin({QuietHoursWindow? quietHours}) async {
     await NotificationService.instance.cancel(_weightCheckinId);
     await _scheduleWeightCheckin(quietHours ?? await QuietHoursWindow.load());
   }
 
-  Future<void> rescheduleDeskBreak(DeskBreakType type, {QuietHoursWindow? quietHours}) async {
-    await _cancelRange(_deskBreakIdBase[type]!, _maxSlotsPerCategory);
-    await _scheduleDeskBreak(type, quietHours ?? await QuietHoursWindow.load());
+  Future<void> _rescheduleDeskBreak(DeskBreakType type, {QuietHoursWindow? quietHours}) async {
+    try {
+      await _cancelRange(_deskBreakIdBase[type]!, _maxSlotsPerCategory);
+      await _scheduleDeskBreak(type, quietHours ?? await QuietHoursWindow.load());
+    } catch (_) {
+      await DeskBreakScheduleHistory.record(type, []);
+      rethrow;
+    }
   }
 
   /// Desk-break active-window (from/to) is shared by all four desk-break
   /// types, so changing it needs all four rescheduled — still far fewer
   /// alarms than a full [rescheduleAll].
-  Future<void> rescheduleAllDeskBreaks() async {
+  Future<void> _rescheduleAllDeskBreaks() async {
     final quietHours = await QuietHoursWindow.load();
     for (final type in DeskBreakType.values) {
-      await rescheduleDeskBreak(type, quietHours: quietHours);
+      await _rescheduleDeskBreak(type, quietHours: quietHours);
     }
-  }
-
-  /// Today's scheduled slots for every enabled desk-break type, in local
-  /// hour/minute — used by [DeskBreakLogRepository.sweepAutoMissed] to
-  /// figure out which slots have gone unanswered. See that method's doc
-  /// for why this is a lazy sweep rather than an exact background timer.
-  Future<Map<DeskBreakType, List<(int hour, int minute)>>> todaysDeskBreakSlots() async {
-    final quietHours = await QuietHoursWindow.load();
-    final fromMinutes = await ReminderPrefs.deskFromMinutes();
-    final toMinutes = await ReminderPrefs.deskToMinutes();
-    final result = <DeskBreakType, List<(int, int)>>{};
-    for (final type in DeskBreakType.values) {
-      if (!await ReminderPrefs.deskBreakEnabled(type)) {
-        result[type] = const [];
-        continue;
-      }
-      result[type] = _dailySlots(
-        fromMinutes: fromMinutes,
-        toMinutes: toMinutes,
-        intervalMinutes: await ReminderPrefs.deskBreakIntervalMinutes(type),
-        quietHours: quietHours,
-      );
-    }
-    return result;
   }
 
   Future<void> _cancelRange(int base, int count) async {
@@ -126,7 +153,7 @@ class ReminderScheduler {
   }
 
   /// Every [hour]:[minute] pair from [fromMinutes] to [toMinutes] stepping
-  /// by [intervalMinutes], capped at [_maxSlotsPerCategory] slots, minus
+  /// by [intervalMinutes], capped at [intervalSlotLimit] slots, minus
   /// any that fall inside [quietHours].
   List<(int hour, int minute)> _dailySlots({
     required int fromMinutes,
@@ -134,17 +161,13 @@ class ReminderScheduler {
     required int intervalMinutes,
     required QuietHoursWindow quietHours,
   }) {
-    final slots = <(int, int)>[];
-    if (intervalMinutes <= 0 || toMinutes <= fromMinutes) return slots;
-    for (
-      var minutes = fromMinutes;
-      minutes <= toMinutes && slots.length < _maxSlotsPerCategory;
-      minutes += intervalMinutes
-    ) {
-      if (quietHours.contains(minutes)) continue;
-      slots.add((minutes ~/ 60, minutes % 60));
-    }
-    return slots;
+    return planReminderSlots(
+      fromMinutes: fromMinutes,
+      toMinutes: toMinutes,
+      intervalMinutes: intervalMinutes,
+      maxSlots: intervalSlotLimit,
+      isQuiet: quietHours.contains,
+    ).slots;
   }
 
   Future<void> _scheduleWater(QuietHoursWindow quietHours) async {
@@ -180,6 +203,7 @@ class ReminderScheduler {
       hour: minutes ~/ 60,
       minute: minutes % 60,
       channel: NotificationChannel.dhyana,
+      payload: 'dhyana',
     );
   }
 
@@ -194,6 +218,7 @@ class ReminderScheduler {
       hour: minutes ~/ 60,
       minute: minutes % 60,
       channel: NotificationChannel.knee,
+      payload: 'knee',
     );
   }
 
@@ -208,17 +233,19 @@ class ReminderScheduler {
       hour: minutes ~/ 60,
       minute: minutes % 60,
       channel: NotificationChannel.genericLow,
+      payload: 'weight',
     );
   }
 
   Future<void> _scheduleDeskBreak(DeskBreakType type, QuietHoursWindow quietHours) async {
-    if (!await ReminderPrefs.deskBreakEnabled(type)) return;
-    final slots = _dailySlots(
-      fromMinutes: await ReminderPrefs.deskFromMinutes(),
-      toMinutes: await ReminderPrefs.deskToMinutes(),
-      intervalMinutes: await ReminderPrefs.deskBreakIntervalMinutes(type),
-      quietHours: quietHours,
-    );
+    final slots = !await ReminderPrefs.deskBreakEnabled(type)
+        ? <(int, int)>[]
+        : _dailySlots(
+            fromMinutes: await ReminderPrefs.deskFromMinutes(),
+            toMinutes: await ReminderPrefs.deskToMinutes(),
+            intervalMinutes: await ReminderPrefs.deskBreakIntervalMinutes(type),
+            quietHours: quietHours,
+          );
     final base = _deskBreakIdBase[type]!;
     for (var i = 0; i < slots.length; i++) {
       final (hour, minute) = slots[i];
@@ -236,6 +263,7 @@ class ReminderScheduler {
         payload: 'deskbreak:${type.name}:$hour:$minute',
       );
     }
+    await DeskBreakScheduleHistory.record(type, slots);
   }
 
   String _deskBreakBody(DeskBreakType type) => switch (type) {
@@ -255,7 +283,11 @@ class QuietHoursWindow {
   final int startMinutes;
   final int endMinutes;
 
-  const QuietHoursWindow({required this.enabled, required this.startMinutes, required this.endMinutes});
+  const QuietHoursWindow({
+    required this.enabled,
+    required this.startMinutes,
+    required this.endMinutes,
+  });
 
   static Future<QuietHoursWindow> load() async {
     return QuietHoursWindow(

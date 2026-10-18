@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
 import 'package:nirvana/data/db/schema.dart';
 import 'package:nirvana/main.dart';
 import 'package:nirvana/providers/repository_providers.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   setUpAll(() {
@@ -35,10 +34,7 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: const NirvanaApp(),
-      ),
+      ProviderScope(overrides: [databaseProvider.overrideWithValue(db)], child: const NirvanaApp()),
     );
     await tester.pumpAndSettle();
 

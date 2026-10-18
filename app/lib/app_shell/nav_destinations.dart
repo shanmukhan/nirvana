@@ -6,11 +6,7 @@ class NavDestination {
   final String label;
   final IconData icon;
 
-  const NavDestination({
-    required this.path,
-    required this.label,
-    required this.icon,
-  });
+  const NavDestination({required this.path, required this.label, required this.icon});
 }
 
 const List<NavDestination> navDestinations = [

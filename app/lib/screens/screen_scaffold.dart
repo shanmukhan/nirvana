@@ -41,7 +41,9 @@ class ScreenScaffold extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).appBarTheme.foregroundColor?.withValues(alpha: 0.8),
+                        color: Theme.of(
+                          context,
+                        ).appBarTheme.foregroundColor?.withValues(alpha: 0.8),
                       ),
                     ),
                   ],

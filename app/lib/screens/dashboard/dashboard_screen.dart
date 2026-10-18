@@ -1,3 +1,5 @@
+import '../../providers/health_log_providers.dart';
+import '../../providers/calendar_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,10 +9,8 @@ import '../../domain/meal_templates.dart';
 import '../../providers/dhyana_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/water_providers.dart';
-import '../exercise/exercise_screen.dart' show exerciseDefinitionsProvider, exerciseSessionsTodayProvider;
-import '../food/food_screen.dart' show mealEntriesTodayProvider;
 import '../screen_scaffold.dart';
-import '../weight/weight_screen.dart' show sevenDayAverageProvider, recentWeightEntriesProvider;
+import '../load_retry.dart';
 
 /// Today/Dashboard — live cards for Weight, Water, Knee, Dhyana, Exercise,
 /// Nutrition today. Movement/Desk-health cards land as those screens go
@@ -22,7 +22,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ScreenScaffold(
       title: 'Dashboard',
-      subtitle: DateFormat('EEE, MMM d').format(DateTime.now()),
+      subtitle: DateFormat('EEE, MMM d').format(ref.watch(currentDayProvider)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -98,7 +98,7 @@ class _WeightCard extends ConsumerWidget {
       onTap: onTap,
       child: avg.when(
         loading: () => const Text('Loading…'),
-        error: (e, _) => const Text('—'),
+        error: (_, _) => LoadRetry(onRetry: () => ref.invalidate(sevenDayAverageProvider)),
         data: (avgKg) {
           final current = entries.asData?.value.firstOrNull;
           return Text(
@@ -128,8 +128,9 @@ class _WaterCard extends ConsumerWidget {
       onTap: onTap,
       child: total.when(
         loading: () => const Text('Loading…'),
-        error: (e, _) => const Text('—'),
-        data: (ml) => Text('$ml ml of ${hydrationConfig.asData?.value.dailyGoalMl ?? 2250} ml goal'),
+        error: (_, _) => LoadRetry(onRetry: () => ref.invalidate(waterTodayTotalProvider)),
+        data: (ml) =>
+            Text('$ml ml of ${hydrationConfig.asData?.value.dailyGoalMl ?? 2250} ml goal'),
       ),
     );
   }
@@ -149,7 +150,7 @@ class _KneeCard extends ConsumerWidget {
       onTap: onTap,
       child: latestAsync.when(
         loading: () => const Text('Loading…'),
-        error: (e, _) => const Text('—'),
+        error: (_, _) => LoadRetry(onRetry: () => ref.invalidate(_latestPainProvider)),
         data: (entry) => Text(
           entry == null
               ? 'No entries yet — tap to log how your knee feels.'
@@ -181,7 +182,7 @@ class _DhyanaCard extends ConsumerWidget {
       onTap: onTap,
       child: sessionsToday.when(
         loading: () => const Text('Loading…'),
-        error: (e, _) => const Text('—'),
+        error: (_, _) => LoadRetry(onRetry: () => ref.invalidate(dhyanaSessionsTodayProvider)),
         data: (sessions) {
           final streakText = streak.asData?.value;
           return Text(
@@ -209,10 +210,18 @@ class _ExerciseCard extends ConsumerWidget {
       onTap: onTap,
       child: definitionsAsync.when(
         loading: () => const Text('Loading…'),
-        error: (e, _) => const Text('—'),
+        error: (_, _) => LoadRetry(onRetry: () => ref.invalidate(exerciseDefinitionsProvider)),
         data: (definitions) {
+          if (sessionsAsync.hasError) {
+            return LoadRetry(onRetry: () => ref.invalidate(exerciseSessionsTodayProvider));
+          }
+          if (sessionsAsync.isLoading) return const Text('Loading…');
           final sessionsToday = sessionsAsync.asData?.value ?? const [];
-          final done = sessionsToday.map((s) => s.exerciseDefinitionId).toSet().length;
+          final done = sessionsToday
+              .where((s) => s.hasWork)
+              .map((s) => s.exerciseDefinitionId)
+              .toSet()
+              .length;
           return Text('$done of ${definitions.length} exercises logged today');
         },
       ),
@@ -234,7 +243,7 @@ class _NutritionCard extends ConsumerWidget {
       onTap: onTap,
       child: entriesAsync.when(
         loading: () => const Text('Loading…'),
-        error: (e, _) => const Text('—'),
+        error: (_, _) => LoadRetry(onRetry: () => ref.invalidate(mealEntriesTodayProvider)),
         data: (entries) {
           final protein = entries.fold<double>(0, (sum, e) => sum + (e.proteinEstimateG ?? 0));
           return Text(

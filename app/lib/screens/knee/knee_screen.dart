@@ -1,19 +1,14 @@
+export '../../providers/health_log_providers.dart'
+    show kneeRefreshProvider, recentPainEntriesProvider;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/entities.dart';
 import '../../providers/repository_providers.dart';
+import '../../providers/health_log_providers.dart';
 import '../screen_scaffold.dart';
-
-final kneeRefreshProvider = StateProvider<int>((ref) => 0);
-
-final recentPainEntriesProvider = FutureProvider.autoDispose<List<PainEntry>>((
-  ref,
-) async {
-  ref.watch(kneeRefreshProvider);
-  return ref.watch(painRepositoryProvider).recent(limit: 14);
-});
+import '../save_button.dart';
 
 /// Pain/swelling/stiffness log. Red-flag symptoms route to a "consider
 /// professional assessment" message, never "push through it".
@@ -40,33 +35,33 @@ class KneeScreen extends ConsumerWidget {
             ? const Center(child: Text('No entries yet. Tap + to log a check-in.'))
             : ListView(
                 padding: const EdgeInsets.all(16),
-                children: [
-                  for (final entry in entries) _PainTile(entry: entry),
-                ],
+                children: [for (final entry in entries) _PainTile(entry: entry)],
               ),
       ),
     );
   }
 
   Future<void> _showLogSheet(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(painRepositoryProvider);
+    final refresh = ref.read(kneeRefreshProvider.notifier);
     final result = await showModalBottomSheet<_PainDraft>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => const _PainEntrySheet(),
+      builder: (context) => _PainEntrySheet(
+        onSave: (result) async {
+          await repo.log(
+            painBefore0to10: result.pain,
+            swelling: result.swelling,
+            stiffness0to10: result.stiffness,
+            sharpPain: result.sharpPain,
+            locking: result.locking,
+            givingWay: result.givingWay,
+          );
+          if (refresh.mounted) refresh.state++;
+        },
+      ),
     );
     if (result == null) return;
-
-    await ref
-        .read(painRepositoryProvider)
-        .log(
-          painBefore0to10: result.pain,
-          swelling: result.swelling,
-          stiffness0to10: result.stiffness,
-          sharpPain: result.sharpPain,
-          locking: result.locking,
-          givingWay: result.givingWay,
-        );
-    ref.read(kneeRefreshProvider.notifier).state++;
 
     final needsAssessment =
         result.sharpPain || result.locking || result.givingWay || result.swelling;
@@ -98,7 +93,9 @@ class _PainTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(
-        entry.needsProfessionalAssessmentFlag ? Icons.warning_amber_outlined : Icons.check_circle_outline,
+        entry.needsProfessionalAssessmentFlag
+            ? Icons.warning_amber_outlined
+            : Icons.check_circle_outline,
         color: entry.needsProfessionalAssessmentFlag ? Colors.orange : null,
       ),
       title: Text('Pain ${entry.painBefore0to10}/10  ·  Stiffness ${entry.stiffness0to10}/10'),
@@ -120,7 +117,8 @@ class _PainDraft {
 }
 
 class _PainEntrySheet extends StatefulWidget {
-  const _PainEntrySheet();
+  final Future<void> Function(_PainDraft) onSave;
+  const _PainEntrySheet({required this.onSave});
 
   @override
   State<_PainEntrySheet> createState() => _PainEntrySheetState();
@@ -131,61 +129,66 @@ class _PainEntrySheetState extends State<_PainEntrySheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Knee check-in', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          Text('Pain: ${_draft.pain}/10'),
-          Slider(
-            value: _draft.pain.toDouble(),
-            min: 0,
-            max: 10,
-            divisions: 10,
-            onChanged: (v) => setState(() => _draft.pain = v.round()),
-          ),
-          Text('Stiffness: ${_draft.stiffness}/10'),
-          Slider(
-            value: _draft.stiffness.toDouble(),
-            min: 0,
-            max: 10,
-            divisions: 10,
-            onChanged: (v) => setState(() => _draft.stiffness = v.round()),
-          ),
-          SwitchListTile(
-            title: const Text('Swelling'),
-            value: _draft.swelling,
-            onChanged: (v) => setState(() => _draft.swelling = v),
-          ),
-          SwitchListTile(
-            title: const Text('Sharp pain'),
-            value: _draft.sharpPain,
-            onChanged: (v) => setState(() => _draft.sharpPain = v),
-          ),
-          SwitchListTile(
-            title: const Text('Locking'),
-            value: _draft.locking,
-            onChanged: (v) => setState(() => _draft.locking = v),
-          ),
-          SwitchListTile(
-            title: const Text('Giving-way'),
-            value: _draft.givingWay,
-            onChanged: (v) => setState(() => _draft.givingWay = v),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(_draft),
-            child: const Text('Save'),
-          ),
-        ],
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Knee check-in', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Text('Pain: ${_draft.pain}/10'),
+            Slider(
+              value: _draft.pain.toDouble(),
+              min: 0,
+              max: 10,
+              divisions: 10,
+              onChanged: (v) => setState(() => _draft.pain = v.round()),
+            ),
+            Text('Stiffness: ${_draft.stiffness}/10'),
+            Slider(
+              value: _draft.stiffness.toDouble(),
+              min: 0,
+              max: 10,
+              divisions: 10,
+              onChanged: (v) => setState(() => _draft.stiffness = v.round()),
+            ),
+            SwitchListTile(
+              title: const Text('Swelling'),
+              value: _draft.swelling,
+              onChanged: (v) => setState(() => _draft.swelling = v),
+            ),
+            SwitchListTile(
+              title: const Text('Sharp pain'),
+              value: _draft.sharpPain,
+              onChanged: (v) => setState(() => _draft.sharpPain = v),
+            ),
+            SwitchListTile(
+              title: const Text('Locking'),
+              value: _draft.locking,
+              onChanged: (v) => setState(() => _draft.locking = v),
+            ),
+            SwitchListTile(
+              title: const Text('Giving-way'),
+              value: _draft.givingWay,
+              onChanged: (v) => setState(() => _draft.givingWay = v),
+            ),
+            const SizedBox(height: 16),
+            SaveButton(
+              onSave: () async {
+                await widget.onSave(_draft);
+                return true;
+              },
+              onSaved: () => Navigator.of(context).pop(_draft),
+            ),
+          ],
+        ),
       ),
     );
   }

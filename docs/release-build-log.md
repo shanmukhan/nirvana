@@ -287,3 +287,53 @@ editable/backdated session log entries, practice/mood trend charts).
 
 **Verification:** `flutter analyze` and `flutter test` clean before
 building.
+
+
+## 2026-10-12 — unreleased repairs on source v1.1.1+11
+
+This is local implementation work, not a record of a published store release.
+The complete item-by-item change/verification log is in
+[the 12 October gap review](2026-10-12-project-gap-review.md).
+
+Repairs cover startup recovery and bootstrap ordering, serialized reminder
+updates and occurrence dating, historical desk-break schedules with explicit
+unknown delivery, actual exercise counts and elapsed timers, calendar rollover,
+foreign-key/reference enforcement, canonical timestamps, uncapped hydration
+streaks, save retry/duplicate guards, and phone-warning quiet hours. SQLite schema
+v3 adds partial exercise reps; tested v1/v2 upgrades preserve existing records.
+
+The iOS schedule reserves capacity within 64 requests and delegate wiring is
+explicit. Xcode/device validation is unavailable on this machine. No iOS binary,
+signed release bundle, store update, or website/privacy deployment was produced.
+CI and SDK/JDK pins were added; the first hosted CI run remains pending.
+
+Final checks passed: 74 tests, no analyzer issues, clean Dart formatting, and
+`flutter build apk --debug --no-pub`. All five notification tones are present in
+`app/build/app/outputs/flutter-apk/app-debug.apk`. Existing Android plugin/Gradle
+migration warnings remain tracked in
+[the earlier improvement log](2026-10-07-improvement-plan.md); dependencies were
+not upgraded during these repairs.
+
+## v1.1.2+12 (2026-10-13) — signed bundle prepared for Play upload
+
+Includes the defect and release-readiness repairs documented in the
+[project gap review](2026-10-12-project-gap-review.md). Optional feature additions
+remain deferred. Version code increased from 11 to 12.
+
+- Command: `flutter build appbundle --release --no-pub` from `app/`.
+- Bundle: `app/build/app/outputs/bundle/release/app-release.aab`.
+- Package: `com.nirvana.nirvana`; version `1.1.2`, code `12`.
+- Minimum Android SDK: 24; target SDK: 36.
+- Size: 61,172,959 bytes (61.2 MB).
+- SHA-256: `fcc247c046272f973607c51c6fc7ee3cd6c7245214a1ced29decd077f296b2d0`.
+- Existing release signing configuration used; `jarsigner -verify` returned
+  `jar verified` with exit code 0. The local JDK 25 verifier also reports
+  self-signed certificate, missing timestamp, and ZIP/JarInputStream warnings.
+- All five packaged notification tones and retention rules verified.
+- Final verification: 74 tests passed, analyzer reported no issues, 87 Dart
+  files formatted with no changes, and `git diff --check` passed.
+
+The bundle is prepared locally; it has not been uploaded or published to Google
+Play. Signing credentials and build artifacts are ignored by Git. Existing
+plugin KGP migration warnings remain; iOS/device validation and hosted CI results
+are still pending.

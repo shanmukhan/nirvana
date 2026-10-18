@@ -1,24 +1,13 @@
+export '../../providers/health_log_providers.dart'
+    show weightRefreshProvider, recentWeightEntriesProvider, sevenDayAverageProvider;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../domain/entities.dart';
 import '../../providers/repository_providers.dart';
+import '../../providers/health_log_providers.dart';
 import '../screen_scaffold.dart';
-
-final weightRefreshProvider = StateProvider<int>((ref) => 0);
-
-final recentWeightEntriesProvider = FutureProvider.autoDispose<List<WeightEntry>>((
-  ref,
-) async {
-  ref.watch(weightRefreshProvider);
-  return ref.watch(weightRepositoryProvider).recent(limit: 14);
-});
-
-final sevenDayAverageProvider = FutureProvider.autoDispose<double?>((ref) async {
-  ref.watch(weightRefreshProvider);
-  return ref.watch(weightRepositoryProvider).sevenDayAverageKg();
-});
+import '../save_button.dart';
 
 /// Weight entry, 7-day average, and trend. See health-plan-source.md §16:
 /// judge progress from the weekly average, never a single day's reading.
@@ -92,44 +81,74 @@ class WeightScreen extends ConsumerWidget {
   }
 
   Future<void> _showAddWeightSheet(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final result = await showModalBottomSheet<double>(
+    final repo = ref.read(weightRepositoryProvider);
+    final refresh = ref.read(weightRefreshProvider.notifier);
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
+      builder: (_) => _WeightEntrySheet(
+        onSave: (kg) async {
+          await repo.add(weightKg: kg);
+          if (refresh.mounted) refresh.state++;
+        },
+      ),
+    );
+  }
+}
+
+class _WeightEntrySheet extends StatefulWidget {
+  final Future<void> Function(double) onSave;
+  const _WeightEntrySheet({required this.onSave});
+  @override
+  State<_WeightEntrySheet> createState() => _WeightEntrySheetState();
+}
+
+class _WeightEntrySheetState extends State<_WeightEntrySheet> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Form(
+        key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Log weight', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
-            TextField(
-              controller: controller,
+            TextFormField(
+              controller: _controller,
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(labelText: 'Weight (kg)'),
+              validator: (text) {
+                final value = double.tryParse(text?.trim() ?? '');
+                return value == null || !value.isFinite || value <= 0
+                    ? 'Enter a weight greater than zero.'
+                    : null;
+              },
             ),
             const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () {
-                final value = double.tryParse(controller.text);
-                if (value != null) Navigator.of(context).pop(value);
+            SaveButton(
+              onSave: () async {
+                if (!_formKey.currentState!.validate()) return false;
+                await widget.onSave(double.parse(_controller.text.trim()));
+                return true;
               },
-              child: const Text('Save'),
+              onSaved: () => Navigator.of(context).pop(),
             ),
           ],
         ),
       ),
-    );
-    if (result != null) {
-      await ref.read(weightRepositoryProvider).add(weightKg: result);
-      ref.read(weightRefreshProvider.notifier).state++;
-    }
-  }
+    ),
+  );
 }
